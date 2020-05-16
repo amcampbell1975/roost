@@ -376,7 +376,15 @@ void loop() {
       display.setTextSize(1);      // Normal 1:1 pixel scale
       display.setTextColor(SSD1306_WHITE); // Draw white text
       display.setCursor(0, 0);     // Start at top-left corner
-      display.print(WiFi.localIP());
+
+      if(1==0){
+          display.print(WiFi.localIP());
+      }else{
+        snprintf (msg, sizeof(msg), "%d:%d", timeClient.getHours(),timeClient.getMinutes());
+        display.print( msg);
+      }
+
+     
       if(odd_even)
         display.println(" -");  
       else
