@@ -87,6 +87,9 @@ void setup_wifi() {
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+
+  timeClient.setUpdateInterval(1000*60*60*24); // only update every 24 hour
+
 }
 
 void reconnect() {
@@ -376,7 +379,6 @@ void loop() {
       display.setTextSize(1);      // Normal 1:1 pixel scale
       display.setTextColor(SSD1306_WHITE); // Draw white text
       display.setCursor(0, 0);     // Start at top-left corner
-
       if(1==0){
           display.print(WiFi.localIP());
       }else{
@@ -384,7 +386,7 @@ void loop() {
         display.print( msg);
       }
 
-     
+
       if(odd_even)
         display.println(" -");  
       else
