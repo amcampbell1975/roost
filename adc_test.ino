@@ -19,7 +19,14 @@
 #include <WiFiUdp.h>
 
 
-const String VERSION = "1.3.4";
+#include <ArduinoOTA.h>
+
+#include "RemoteDebug.h" //https://github.com/JoaoLopesF/RemoteDebug
+
+RemoteDebug Debug;
+
+
+const String VERSION = "1.3.5";
 
 const char* MQTT_SERVER= "192.168.0.250";
 
@@ -88,8 +95,37 @@ void setup_wifi() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
-  timeClient.setUpdateInterval(1000*60*60*24); // only update every 24 hour
+  ArduinoOTA.setHostname("Roost");
+  ArduinoOTA
+    .onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH)
+        type = "sketch";
+      else // U_SPIFFS
+        type = "filesystem";
 
+      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+      Serial.println("Start updating " + type);
+    })
+    .onEnd([]() {
+      Serial.println("\nEnd");
+    })
+    .onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    })
+    .onError([](ota_error_t error) {
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
+
+  ArduinoOTA.begin();
+
+
+ 
 }
 
 void reconnect() {
@@ -177,6 +213,10 @@ void setup() {
   // GMT -1 = -3600
   // GMT 0 = 0
   timeClient.setTimeOffset(3600);
+  timeClient.setUpdateInterval(1000*60*60*24); // only update every 24 hour
+
+  Debug.begin("Debug started");
+  
 
   display.clearDisplay();  display.setCursor(0, 0);    
   display.println(F("Calibrating Voltage Current"));  
@@ -260,6 +300,8 @@ void loop() {
     mqtt_client.loop();
   }
   timeClient.update();
+  Debug.handle();
+  ArduinoOTA.handle();
   
   static long int loop_counter =0;
   loop_counter++;
@@ -359,6 +401,19 @@ void loop() {
       Serial.print(" kwh=");
       Serial.print(kwh);
 
+
+      debugD("Time              = %02d:%02d", timeClient.getHours(),timeClient.getMinutes());
+      debugD("Power             = %f", kwh);
+      debugD("immersion heater  = %d", immersion_header_on);
+      debugD("immersion_minutes = %d", immersion_minutes);
+      debugD("immersion_hours   = %f", immersion_minutes/60.0);      
+      
+      debugD("adc_i_max         = %d", emon1.adc_i_max);
+      debugD("adc_i_min         = %d", emon1.adc_i_min);
+      
+      debugD("power_threshold   = %d", power_threshold);
+      debugD("ESP free heap     = %d", ESP.getFreeHeap());
+      debugD("worth while       = %f",     WORTH_WHILE);
 
       //Serial.println(">");
       
