@@ -21,12 +21,13 @@
 
 #include <ArduinoOTA.h>
 
+// Modify libraries/RemoteDebug/src/RemoteDebugCfg.h #define MAX_TIME_INACTIVE 0
 #include "RemoteDebug.h" //https://github.com/JoaoLopesF/RemoteDebug
 
 RemoteDebug Debug;
 
 
-const String VERSION = "1.3.5";
+const String VERSION = "1.4.6";
 
 const char* MQTT_SERVER= "192.168.0.250";
 
@@ -213,7 +214,8 @@ void setup() {
   // GMT -1 = -3600
   // GMT 0 = 0
   timeClient.setTimeOffset(3600);
-  timeClient.setUpdateInterval(1000*60*60*24); // only update every 24 hour
+  //timeClient.setUpdateInterval(1000*60*60*24); // only update every 24 hour
+  timeClient.setUpdateInterval(1000*60*60*1); // update every 1 hour
 
   Debug.begin("Debug started");
   
@@ -329,6 +331,10 @@ void loop() {
     Serial.print(" next=");
     Serial.print(next_event);
     Serial.println("");
+  
+    debugD("@G");
+    DisplayDebug("@G");
+    
     
     // Toggle Blue LED to indicate something is happening.
     static int odd_even=0;
@@ -338,9 +344,15 @@ void loop() {
       odd_even=0;
     digitalWrite(BLUE_LED, odd_even);
 
+    debugD("@H");
+    DisplayDebug("@H");
+    
     // Make Measurement
     emon1.calcVI(50, 2500);   //crossings , timeout (ms)   50 crossing=1second.
 
+    debugD("@I");
+    DisplayDebug("@I");
+    
     // Calculate threshold for turning on the immersion heater On/Off.
     if (immersion_header_on==true){
       power_threshold = -WORTH_WHILE +  immersion_header_power;
@@ -358,6 +370,8 @@ void loop() {
     }
     kwh = ((sum/circular_buffer.size()));
 
+    debugD("@J");
+    DisplayDebug("@J");
 
     if (immersion_header_on)
       circular_buffer_immersion.push(1);
@@ -374,6 +388,8 @@ void loop() {
       immersion_minutes = sum * 0.5;
     }
 
+    debugD("@K");
+    DisplayDebug("@K");
 
     // Log values to console
     if(1){
@@ -403,7 +419,7 @@ void loop() {
 
 
       debugD("Time              = %02d:%02d", timeClient.getHours(),timeClient.getMinutes());
-      debugD("Power             = %f", kwh);
+      debugD("Power             = %0.2f", emon1.realPower);
       debugD("immersion heater  = %d", immersion_header_on);
       debugD("immersion_minutes = %d", immersion_minutes);
       debugD("immersion_hours   = %f", immersion_minutes/60.0);      
@@ -430,6 +446,9 @@ void loop() {
       //if(odd_even)
       //  emon1.realPower=2000;
 
+    DisplayDebug("@KK");
+
+
       display.clearDisplay();
       display.setTextSize(1);      // Normal 1:1 pixel scale
       display.setTextColor(SSD1306_WHITE); // Draw white text
@@ -440,7 +459,7 @@ void loop() {
         snprintf (msg, sizeof(msg), "%d:%d", timeClient.getHours(),timeClient.getMinutes());
         display.print( msg);
       }
-
+      debugD("@L");
 
       if(odd_even)
         display.println(" -");  
@@ -460,6 +479,8 @@ void loop() {
 
 
 
+      debugD("@M");
+      DisplayDebug("@M");
       
       
 
@@ -480,6 +501,10 @@ void loop() {
 
       
     }
+
+    debugD("@N");
+    DisplayDebug("@N");
+
     // Log messages to MQTT.
     if(1){
      
@@ -529,6 +554,8 @@ void loop() {
       
       
     }
+    debugD("@O");
+    DisplayDebug("@O");
 
    
     // Switch Immersion Heater on/off dependent on threshold.
@@ -544,6 +571,8 @@ void loop() {
         immersion_header_on=false;
       }
     }
+    debugD("@P");
+    DisplayDebug("@P");
 
     {
       int hours = timeClient.getHours();
@@ -556,8 +585,13 @@ void loop() {
       }
       
     }
+    debugD("@Q");
+    DisplayDebug("@Q");
+
   }
-  
+  debugD("@R");
+  DisplayDebug("@R");
+
 }
 
 void SonoffSend(int PowerOn)
@@ -595,3 +629,23 @@ void SonoffSend(int PowerOn)
   */
   
 }
+
+
+void DisplayDebug(char * message){
+  //display.clearDisplay();  
+  //display.setCursor(10, 0);    
+  //display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); // Draw 'inverse' text
+  //display.println(message);  
+
+  display.fillRect(64, 1, 25,25, SSD1306_BLACK);
+  display.drawRect(64, 1, 25,25, SSD1306_WHITE);
+  
+  display.setCursor(64+5, 0+5);    
+  display.setTextColor(SSD1306_WHITE); 
+  display.println(message);  
+  
+  
+  display.display();
+}
+
+  
