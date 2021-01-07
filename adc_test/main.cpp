@@ -1,13 +1,4 @@
 #include <Arduino.h>
-/*
-void setup() {
-  // put your setup code here, to run once:
-}
-
-void loop() {
-  // put your main code here, to run repeatedly:
-}*/
-
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -37,7 +28,7 @@ void loop() {
 RemoteDebug Debug;
 
 
-const String VERSION = "1.4.7";
+const String VERSION = "1.4.9";
 
 const char* MQTT_SERVER= "192.168.0.250";
 
@@ -52,6 +43,8 @@ CircularBuffer<char, 60*2*24> circular_buffer_immersion;
 
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
+
+#include "main.h"
 
 #include "emonlib.h"
  
@@ -69,11 +62,9 @@ const double immersion_header_power=1000;
 const double WORTH_WHILE = 900;
 const int MEASUREMENT_POWER_INTERVAL = 30; //seconds
 
-char msg[150];
+char msg[1024];
 
 
-void SonoffSend(int PowerOn);
-void DisplayDebug(char * message);
 
 
 void callback(char* topic, byte* message, unsigned int length) {
@@ -194,8 +185,8 @@ void reconnect() {
 }
 
 
-// Potentiometer is connected to GPIO 34 (Analog ADC1_CH6) 
-const int VoltsPin = 34;
+
+const int VoltsPin = 34;   //GPIO 34 (Analog ADC1_CH6) 
 const int AmpsPin = 32;
 const int BLUE_LED = 2;
 
@@ -288,12 +279,16 @@ void setup() {
 }
 
 
+float export_kwh=0;
+float import_kwh=0;
 
 
 void loop() {
   int power_threshold=0;
   float kwh=0;
   int immersion_minutes=0;
+
+
 
   // MQTT Connection.
   if(1){
@@ -395,6 +390,15 @@ void loop() {
       immersion_minutes = sum * 0.5;
     }
 
+    if(emon1.realPower <0){
+      export_kwh += -((emon1.realPower/1000)/120); // convert from Watts per 30 seconds to KWh
+    }
+    if(emon1.realPower >0){
+      import_kwh +=  ((emon1.realPower/1000)/120); // convert from Watts per 30 seconds to KWh
+    }
+
+
+
     debugD("@K");
     DisplayDebug("@K");
 
@@ -430,7 +434,11 @@ void loop() {
       debugD("immersion heater  = %d", immersion_header_on);
       debugD("immersion_minutes = %d", immersion_minutes);
       debugD("immersion_hours   = %f", immersion_minutes/60.0);      
-      
+
+      debugD("export_kwh   = %f", export_kwh);      
+      debugD("import_kwh   = %f", import_kwh);      
+
+
       debugD("adc_i_max         = %d", emon1.adc_i_max);
       debugD("adc_i_min         = %d", emon1.adc_i_min);
       
@@ -533,6 +541,12 @@ void loop() {
       snprintf (msg, 50, "%f",     immersion_minutes/60.0);
       mqtt_client.publish("House/immersion_hours", msg);      
       
+      snprintf (msg, 50, "%f",     import_kwh);
+      mqtt_client.publish("House/import_kwh", msg);     
+
+      snprintf (msg, 50, "%f",     export_kwh);
+      mqtt_client.publish("House/export_kwh", msg);     
+
       snprintf (msg, sizeof(msg), "%d", emon1.adc_i_max);
       mqtt_client.publish("House/debug_adc_i_max", msg);
 
@@ -589,6 +603,9 @@ void loop() {
       {
         //circular_buffer.clear();
         circular_buffer_immersion.clear();
+        export_kwh=0;
+        import_kwh=0;
+
       }
       
     }
