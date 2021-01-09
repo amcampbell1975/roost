@@ -279,8 +279,8 @@ void setup() {
 }
 
 
-float export_kwh=0;
-float import_kwh=0;
+double export_kwh=0;
+double import_kwh=0;
 
 
 void loop() {
@@ -394,7 +394,11 @@ void loop() {
       export_kwh += -((emon1.realPower/1000)/120); // convert from Watts per 30 seconds to KWh
     }
     if(emon1.realPower >0){
+
+      debugD(" import   = %.10f",  import_kwh   );
       import_kwh +=  ((emon1.realPower/1000)/120); // convert from Watts per 30 seconds to KWh
+      debugD(" import  += %.10f",  ((emon1.realPower/1000)/120)   );
+      debugD(" import   = %.10f",  import_kwh   );
     }
 
 
