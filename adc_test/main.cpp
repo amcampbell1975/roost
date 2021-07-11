@@ -28,7 +28,7 @@
 RemoteDebug Debug;
 
 
-const String VERSION = "1.4.9";
+const String VERSION = "1.5.0";
 
 const char* MQTT_SERVER= "192.168.0.250";
 
@@ -88,18 +88,19 @@ void DisplayDebug(char * message){
   display.display();
 }
 
+void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info){
+  Serial.println("WiFiStationConnected() sucesss");
+}
+void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
+  Serial.println("WiFiGotIP() ");
+  Serial.println(WiFi.localIP());
+}
+void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info){
+  Serial.println("WiFiStationDisconnected() ");
+}
 
-void setup_wifi() {
-  delay(10);
-  // We start by connecting to a WiFi network
-  Serial.println();
-  Serial.print("Version ");
-  Serial.print(VERSION);
-  Serial.println(", Wifi Connecting...");
-  
-
-  WiFi.begin(WIFI_SSID,WIFI_PASSWORD);
-  
+void WiFiNotHappy(void)
+{
   int count=0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -123,6 +124,25 @@ void setup_wifi() {
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+
+}
+
+void setup_wifi() {
+  delay(10);
+  // We start by connecting to a WiFi network
+  Serial.println();
+  Serial.print("Version ");
+  Serial.print(VERSION);
+  
+  WiFi.onEvent(WiFiStationConnected   ,SYSTEM_EVENT_STA_CONNECTED);
+  WiFi.onEvent(WiFiGotIP              ,SYSTEM_EVENT_ETH_GOT_IP);
+  WiFi.onEvent(WiFiStationDisconnected,SYSTEM_EVENT_STA_DISCONNECTED);
+  
+  
+  Serial.println(", Wifi Connecting...");
+  WiFi.begin(WIFI_SSID,WIFI_PASSWORD);
+  
+  WiFiNotHappy();
 
   ArduinoOTA.setHostname("Roost");
   ArduinoOTA
@@ -288,7 +308,17 @@ void loop() {
   float kwh=0;
   int immersion_minutes=0;
 
+  if (WiFi.status() != WL_CONNECTED){
+    DisplayDebug((char *)"@ZZ");
+    WiFiNotHappy();
+  }
 
+  if (WiFi.status() != WL_CONNECTED)  // Don't make measurement if Wifi is not connected
+    return;
+  
+  ArduinoOTA.handle();
+  Debug.handle();
+  timeClient.update();
 
   // MQTT Connection.
   if(1){
@@ -298,14 +328,9 @@ void loop() {
       display.clearDisplay();  display.setCursor(0, 0);    
       display.println(F("MQTT not connected!"));  
       display.display();
-
-
     }
     mqtt_client.loop();
   }
-  timeClient.update();
-  Debug.handle();
-  ArduinoOTA.handle();
   
   static long int loop_counter =0;
   loop_counter++;
