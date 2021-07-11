@@ -28,7 +28,7 @@
 RemoteDebug Debug;
 
 
-const String VERSION = "1.5.0";
+const String VERSION = "1.5.1";
 
 const char* MQTT_SERVER= "192.168.0.250";
 
@@ -39,7 +39,6 @@ NTPClient timeClient(ntpUDP);
 
 CircularBuffer<float, 60*2> circular_buffer;
 CircularBuffer<char, 60*2*24> circular_buffer_immersion;
-
 
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
@@ -64,6 +63,8 @@ const int MEASUREMENT_POWER_INTERVAL = 30; //seconds
 
 char msg[1024];
 
+String wifi_message_connect;
+String wifi_message_disconnect;
 
 
 
@@ -90,6 +91,7 @@ void DisplayDebug(char * message){
 
 void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.println("WiFiStationConnected() sucesss");
+  wifi_message_connect="connect at " + timeClient.getFormattedTime();
 }
 void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.println("WiFiGotIP() ");
@@ -97,6 +99,7 @@ void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
 }
 void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.println("WiFiStationDisconnected() ");
+  wifi_message_disconnect="disconnect at " + timeClient.getFormattedTime();
 }
 
 void WiFiNotHappy(void)
@@ -590,7 +593,13 @@ void loop() {
 
       snprintf (msg, 50, "%d", ESP.getFreeHeap());
       mqtt_client.publish("House/debug_getFreeHeap", msg);      
-      
+
+      snprintf (msg, 50, "%s", wifi_message_connect);
+      mqtt_client.publish("House/wifi_connect", msg);      
+
+      snprintf (msg, 50, "%s", wifi_message_disconnect);
+      mqtt_client.publish("House/wifi_disconnect", msg);      
+
       snprintf (msg, sizeof(msg), "%d:%d", timeClient.getHours(),timeClient.getMinutes());
       mqtt_client.publish("House/debug_time", msg);
 
