@@ -594,11 +594,11 @@ void loop() {
       snprintf (msg, 50, "%d", ESP.getFreeHeap());
       mqtt_client.publish("House/debug_getFreeHeap", msg);      
 
-      snprintf (msg, 50, "%s", wifi_message_connect);
+      snprintf (msg, 50, "%s", wifi_message_connect.c_str());
       mqtt_client.publish("House/wifi_connect", msg);      
 
-      snprintf (msg, 50, "%s", wifi_message_disconnect);
-      mqtt_client.publish("House/wifi_disconnect", msg);      
+      snprintf (msg, 50, "%s", wifi_message_disconnect.c_str());
+      mqtt_client.publish("House/wifi_disconnect", msg);     
 
       snprintf (msg, sizeof(msg), "%d:%d", timeClient.getHours(),timeClient.getMinutes());
       mqtt_client.publish("House/debug_time", msg);
