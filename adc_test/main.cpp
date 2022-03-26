@@ -28,7 +28,7 @@
 RemoteDebug Debug;
 
 
-const String VERSION = "1.5.1";
+const String VERSION = "1.5.3";
 
 const char* MQTT_SERVER= "192.168.0.250";
 
