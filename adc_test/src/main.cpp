@@ -14,9 +14,9 @@
 
 
 // Rolling 24 Hours buffer
-#include <CircularBuffer.h>  // https://github.com/rlogiacco/CircularBuffer
+//#include <CircularBuffer.h>  // https://github.com/rlogiacco/CircularBuffer
 
-#include <NTPClient.h>
+//#include <NTPClient.h>
 #include <WiFiUdp.h>
 
 
@@ -28,17 +28,17 @@
 RemoteDebug Debug;
 
 
-const String VERSION = "1.5.3";
+const String VERSION = "2.0.0";
 
 const char* MQTT_SERVER= "192.168.0.250";
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
+//NTPClient timeClient(ntpUDP);
 
 
-CircularBuffer<float, 60*2> circular_buffer;
-CircularBuffer<char, 60*2*24> circular_buffer_immersion;
+//CircularBuffer<float, 60*2> circular_buffer;
+//CircularBuffer<char, 60*2*24> circular_buffer_immersion;
 
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
@@ -56,9 +56,9 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 
 
-boolean immersion_header_on=false; 
-const double immersion_header_power=1000;
-const double WORTH_WHILE = 900;
+//boolean immersion_header_on=false; 
+//const double immersion_header_power=1000;
+//const double WORTH_WHILE = 900;
 const int MEASUREMENT_POWER_INTERVAL = 30; //seconds
 
 char msg[1024];
@@ -91,7 +91,7 @@ void DisplayDebug(char * message){
 
 void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.println("WiFiStationConnected() sucesss");
-  wifi_message_connect="connect at " + timeClient.getFormattedTime();
+//  wifi_message_connect="connect at " + timeClient.getFormattedTime();
 }
 void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.println("WiFiGotIP() ");
@@ -99,7 +99,7 @@ void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
 }
 void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.println("WiFiStationDisconnected() ");
-  wifi_message_disconnect="disconnect at " + timeClient.getFormattedTime();
+//  wifi_message_disconnect="disconnect at " + timeClient.getFormattedTime();
 }
 
 void WiFiNotHappy(void)
@@ -258,15 +258,15 @@ void setup() {
   mqtt_client.setCallback(callback);
 
 
-  timeClient.begin();
+  //timeClient.begin();
     // Set offset time in seconds to adjust for your timezone, for example:
   // GMT +1 = 3600
   // GMT +8 = 28800
   // GMT -1 = -3600
   // GMT 0 = 0
-  timeClient.setTimeOffset(3600);
+  //timeClient.setTimeOffset(3600);
   //timeClient.setUpdateInterval(1000*60*60*24); // only update every 24 hour
-  timeClient.setUpdateInterval(1000*60*60*1); // update every 1 hour
+  //timeClient.setUpdateInterval(1000*60*60*1); // update every 1 hour
 
   Debug.begin("Debug started");
   
@@ -302,14 +302,14 @@ void setup() {
 }
 
 
-double export_kwh=0;
-double import_kwh=0;
+//double export_kwh=0;
+//double import_kwh=0;
 
 
 void loop() {
-  int power_threshold=0;
-  float kwh=0;
-  int immersion_minutes=0;
+//  int power_threshold=0;
+  //float kwh=0;
+//  int immersion_minutes=0;
 
   if (WiFi.status() != WL_CONNECTED){
     DisplayDebug((char *)"@ZZ");
@@ -321,7 +321,7 @@ void loop() {
   
   ArduinoOTA.handle();
   Debug.handle();
-  timeClient.update();
+//  timeClient.update();
 
   // MQTT Connection.
   if(1){
@@ -337,14 +337,14 @@ void loop() {
   
   static long int loop_counter =0;
   loop_counter++;
-  if (loop_counter%2000 ==0){
-      int position= (loop_counter/2000) % SCREEN_WIDTH;
-
-      display.drawLine(0       ,SCREEN_HEIGHT-10, position    , SCREEN_HEIGHT-10, SSD1306_WHITE);  
-      display.drawLine(position,SCREEN_HEIGHT-10, SCREEN_WIDTH, SCREEN_HEIGHT-10, SSD1306_BLACK);  
-
-      display.display();
-   }
+  //if (loop_counter%2000 ==0){
+  //    int position= (loop_counter/2000) % SCREEN_WIDTH;
+//
+  //    display.drawLine(0       ,SCREEN_HEIGHT-10, position    , SCREEN_HEIGHT-10, SSD1306_WHITE);  
+  //    display.drawLine(position,SCREEN_HEIGHT-10, SCREEN_WIDTH, SCREEN_HEIGHT-10, SSD1306_BLACK);  
+//
+  //    display.display();
+  // }
   
   
   if(1){
@@ -362,8 +362,8 @@ void loop() {
     Serial.print(next_event);
     Serial.println("");
   
-    debugD("@GG");
-    DisplayDebug((char *)"@GG");
+    //debugD("@GG");
+    //DisplayDebug((char *)"@GG");
     
     
     // Toggle Blue LED to indicate something is happening.
@@ -374,65 +374,65 @@ void loop() {
       odd_even=0;
     digitalWrite(BLUE_LED, odd_even);
 
-    debugD("@H");
-    DisplayDebug("@H");
+    //debugD("@H");
+    //DisplayDebug("@H");
     
     // Make Measurement
     emon1.calcVI(50, 2500);   //crossings , timeout (ms)   50 crossing=1second.
 
-    debugD("@I");
-    DisplayDebug("@I");
+    //debugD("@I");
+    //DisplayDebug("@I");
     
-    // Calculate threshold for turning on the immersion heater On/Off.
-    if (immersion_header_on==true){
-      power_threshold = -WORTH_WHILE +  immersion_header_power;
-    }else{
-      power_threshold = -WORTH_WHILE;   //immersion_header_power
-    }
+  //  // Calculate threshold for turning on the immersion heater On/Off.
+  //  if (immersion_header_on==true){
+  //    power_threshold = -WORTH_WHILE +  immersion_header_power;
+  //  }else{
+  //    power_threshold = -WORTH_WHILE;   //immersion_header_power
+  //  }
 
-    circular_buffer.push(emon1.realPower/1000);
+  //  circular_buffer.push(emon1.realPower/1000);
     //int index_t;
-    float sum=0;
+  //  float sum=0;
+//
+  //  using index_t = decltype(circular_buffer)::index_t;
+  //  for (index_t i = 0; i < circular_buffer.size(); i++) {
+  //    sum += (circular_buffer[i]);
+  //  }
+  //  kwh = ((sum/circular_buffer.size()));
 
-    using index_t = decltype(circular_buffer)::index_t;
-    for (index_t i = 0; i < circular_buffer.size(); i++) {
-      sum += (circular_buffer[i]);
-    }
-    kwh = ((sum/circular_buffer.size()));
+    //debugD("@J");
+    //DisplayDebug("@J");
 
-    debugD("@J");
-    DisplayDebug("@J");
-
-    if (immersion_header_on)
-      circular_buffer_immersion.push(1);
-    else
-      circular_buffer_immersion.push(0);
+  //  if (immersion_header_on)
+  //    circular_buffer_immersion.push(1);
+  //  else
+  //    circular_buffer_immersion.push(0);
       
-    {
-      float sum=0;
-      //int index_t;
-      using index_t = decltype(circular_buffer_immersion)::index_t;
-      for (index_t i = 0; i < circular_buffer_immersion.size(); i++) {
-        sum += (circular_buffer_immersion[i]);
-      }
-      immersion_minutes = sum * 0.5;
-    }
+  //  {
+  //    float sum=0;
+  //    //int index_t;
+  //    using index_t = decltype(circular_buffer_immersion)::index_t;
+  //    for (index_t i = 0; i < circular_buffer_immersion.size(); i++) {
+  //      sum += (circular_buffer_immersion[i]);
+  //    }
+  //    immersion_minutes = sum * 0.5;
+  //  }
 
-    if(emon1.realPower <0){
-      export_kwh += -((emon1.realPower/1000)/120); // convert from Watts per 30 seconds to KWh
-    }
-    if(emon1.realPower >0){
+  //  if(emon1.realPower <0){
+  //    export_kwh += -((emon1.realPower/1000)/120); // convert from Watts per 30 seconds to KWh
+  //  }
+  //  if(emon1.realPower >0){
+//
+  //    debugD(" import   = %.10f",  import_kwh   );
+  //    import_kwh +=  ((emon1.realPower/1000)/120); // convert from Watts per 30 seconds to KWh
+  //    debugD(" import  += %.10f",  ((emon1.realPower/1000)/120)   );
+  //    debugD(" import   = %.10f",  import_kwh   );
+  //  }
 
-      debugD(" import   = %.10f",  import_kwh   );
-      import_kwh +=  ((emon1.realPower/1000)/120); // convert from Watts per 30 seconds to KWh
-      debugD(" import  += %.10f",  ((emon1.realPower/1000)/120)   );
-      debugD(" import   = %.10f",  import_kwh   );
-    }
 
 
-
-    debugD("@K");
-    DisplayDebug("@K");
+    //debugD("@K");
+    //DisplayDebug("@K");
 
     // Log values to console
     if(1){
@@ -451,32 +451,32 @@ void loop() {
       Serial.print(" adc min I=");
       Serial.print(emon1.adc_i_min);
 
-      Serial.print(" power threshold=");
-      Serial.print(power_threshold);
+      //Serial.print(" power threshold=");
+      //Serial.print(power_threshold);
 
-      Serial.print(" immersion_header_on=");
-      Serial.print(immersion_header_on);
+      //Serial.print(" immersion_header_on=");
+      //Serial.print(immersion_header_on);
 
-      Serial.print(" kwh=");
-      Serial.print(kwh);
+      //Serial.print(" kwh=");
+      //Serial.print(kwh);
 
 
-      debugD("Time              = %02d:%02d", timeClient.getHours(),timeClient.getMinutes());
-      debugD("Power             = %0.2f", emon1.realPower);
-      debugD("immersion heater  = %d", immersion_header_on);
-      debugD("immersion_minutes = %d", immersion_minutes);
-      debugD("immersion_hours   = %f", immersion_minutes/60.0);      
+      //debugD("Time              = %02d:%02d", timeClient.getHours(),timeClient.getMinutes());
+      //debugD("Power             = %0.2f", emon1.realPower);
+      //debugD("immersion heater  = %d", immersion_header_on);
+      //debugD("immersion_minutes = %d", immersion_minutes);
+      //debugD("immersion_hours   = %f", immersion_minutes/60.0);      
 
-      debugD("export_kwh   = %f", export_kwh);      
-      debugD("import_kwh   = %f", import_kwh);      
+      //debugD("export_kwh   = %f", export_kwh);      
+      //debugD("import_kwh   = %f", import_kwh);      
 
 
       debugD("adc_i_max         = %d", emon1.adc_i_max);
       debugD("adc_i_min         = %d", emon1.adc_i_min);
       
-      debugD("power_threshold   = %d", power_threshold);
+      //debugD("power_threshold   = %d", power_threshold);
       debugD("ESP free heap     = %d", ESP.getFreeHeap());
-      debugD("worth while       = %f",     WORTH_WHILE);
+      //debugD("worth while       = %f",     WORTH_WHILE);
 
       //Serial.println(">");
       
@@ -493,55 +493,57 @@ void loop() {
       //if(odd_even)
       //  emon1.realPower=2000;
 
-    DisplayDebug("@KK");
+    //DisplayDebug("@KK");
 
 
       display.clearDisplay();
       display.setTextSize(1);      // Normal 1:1 pixel scale
       display.setTextColor(SSD1306_WHITE); // Draw white text
-      display.setCursor(0, 0);     // Start at top-left corner
-      if(1==0){
-          display.print(WiFi.localIP());
-      }else{
-        snprintf (msg, sizeof(msg), "%d:%d", timeClient.getHours(),timeClient.getMinutes());
-        display.print( msg);
-      }
-      debugD("@L");
+      
+      
+      display.setCursor(0, 5+ random(30));     // Start at top-left corner
+      //if(1==0){
+      //    display.print(WiFi.localIP());
+      //}else{
+      //  //snprintf (msg, sizeof(msg), "%d:%d", timeClient.getHours(),timeClient.getMinutes());
+      //  //display.print( msg);
+      //}
+      //debugD("@L");
 
-      if(odd_even)
-        display.println(" -");  
-      else
-        display.println(" |");  
+      //if(odd_even)
+      //  display.println(" -");  
+      //else
+      //  display.println(" |");  
 
-      display.setTextSize(1);      // Normal 1:1 pixel scale
+      display.setTextSize(2);      // Normal 1:1 pixel scale
       display.print(emon1.realPower);  display.println(" W");  
-      display.print(kwh);              display.println(" KWh");  
-      display.print(immersion_minutes);display.println(" Mins");  
+      //display.print(kwh);              display.println(" KWh");  
+      //display.print(immersion_minutes);display.println(" Mins");  
       //display.print(emon1.Irms);       display.println(" A");  
       
-      if (immersion_header_on)
-        display.println("Heater ON");  
-      else
-        display.println("Heater OFF");  
+      //if (immersion_header_on)
+      //  display.println("Heater ON");  
+      //else
+      //  display.println("Heater OFF");  
 
 
 
-      debugD("@M");
-      DisplayDebug("@M");
+      //debugD("@M");
+      //DisplayDebug("@M");
       
       
 
-      int width;
-      if(emon1.realPower >0 )
-        width=SCREEN_WIDTH*( emon1.realPower / 8000.0);
-      else   
-        width=SCREEN_WIDTH*(-emon1.realPower / 4000.0); 
-
-      //display.drawLine(0,SCREEN_HEIGHT-10, SCREEN_WIDTH, SCREEN_HEIGHT-10, SSD1306_WHITE);  
-      if(emon1.realPower >0 )
-        display.fillRect(0, SCREEN_HEIGHT-4,width , 4, SSD1306_WHITE);
-      else
-        display.fillRect(0, SCREEN_HEIGHT-8,width , 8, SSD1306_WHITE);
+      //int width;
+      //if(emon1.realPower >0 )
+      //  width=SCREEN_WIDTH*( emon1.realPower / 8000.0);
+      //else   
+      //  width=SCREEN_WIDTH*(-emon1.realPower / 4000.0); 
+      //
+      ////display.drawLine(0,SCREEN_HEIGHT-10, SCREEN_WIDTH, SCREEN_HEIGHT-10, SSD1306_WHITE);  
+      //if(emon1.realPower >0 )
+      //  display.fillRect(0, SCREEN_HEIGHT-4,width , 4, SSD1306_WHITE);
+      //else
+      //  display.fillRect(0, SCREEN_HEIGHT-8,width , 8, SSD1306_WHITE);
       
       
       display.display();
@@ -549,8 +551,8 @@ void loop() {
       
     }
 
-    debugD("@N");
-    DisplayDebug("@N");
+    //debugD("@N");
+    //DisplayDebug("@N");
 
     // Log messages to MQTT.
     if(1){
@@ -564,20 +566,20 @@ void loop() {
       snprintf (msg, sizeof(msg), "%0.2f", emon1.realPower);
       mqtt_client.publish("House/Power", msg);
 
-      snprintf (msg, 50, "%f",     kwh);
-      mqtt_client.publish("House/kwh", msg);      
+      //snprintf (msg, 50, "%f",     kwh);
+      //mqtt_client.publish("House/kwh", msg);      
 
-      snprintf (msg, 50, "%d",     immersion_minutes);
-      mqtt_client.publish("House/immersion_minutes", msg);      
+      //snprintf (msg, 50, "%d",     immersion_minutes);
+      //mqtt_client.publish("House/immersion_minutes", msg);      
 
-      snprintf (msg, 50, "%f",     immersion_minutes/60.0);
-      mqtt_client.publish("House/immersion_hours", msg);      
+      //snprintf (msg, 50, "%f",     immersion_minutes/60.0);
+      //mqtt_client.publish("House/immersion_hours", msg);      
       
-      snprintf (msg, 50, "%f",     import_kwh);
-      mqtt_client.publish("House/import_kwh", msg);     
+      //snprintf (msg, 50, "%f",     import_kwh);
+      //mqtt_client.publish("House/import_kwh", msg);     
 
-      snprintf (msg, 50, "%f",     export_kwh);
-      mqtt_client.publish("House/export_kwh", msg);     
+      //snprintf (msg, 50, "%f",     export_kwh);
+      //mqtt_client.publish("House/export_kwh", msg);     
 
       snprintf (msg, sizeof(msg), "%d", emon1.adc_i_max);
       mqtt_client.publish("House/debug_adc_i_max", msg);
@@ -585,11 +587,16 @@ void loop() {
       snprintf (msg, sizeof(msg), "%d", emon1.adc_i_min);
       mqtt_client.publish("House/debug_adc_i_min", msg);
 
-      snprintf (msg, sizeof(msg), "%d", power_threshold);
-      mqtt_client.publish("House/debug_power_threshold", msg);
+      snprintf (msg, sizeof(msg), "%lld", esp_timer_get_time());
+      mqtt_client.publish("House/esp_timer_get_time", msg);
+ 
 
-      snprintf (msg, 50, "%d", immersion_header_on);
-      mqtt_client.publish("House/debug_immersion_header", msg);      
+
+      //snprintf (msg, sizeof(msg), "%d", power_threshold);
+      //mqtt_client.publish("House/debug_power_threshold", msg);
+
+      //snprintf (msg, 50, "%d", immersion_header_on);
+      //mqtt_client.publish("House/debug_immersion_header", msg);      
 
       snprintf (msg, 50, "%d", ESP.getFreeHeap());
       mqtt_client.publish("House/debug_getFreeHeap", msg);      
@@ -600,11 +607,11 @@ void loop() {
       snprintf (msg, 50, "%s", wifi_message_disconnect.c_str());
       mqtt_client.publish("House/wifi_disconnect", msg);     
 
-      snprintf (msg, sizeof(msg), "%d:%d", timeClient.getHours(),timeClient.getMinutes());
-      mqtt_client.publish("House/debug_time", msg);
+      //snprintf (msg, sizeof(msg), "%d:%d", timeClient.getHours(),timeClient.getMinutes());
+      //mqtt_client.publish("House/debug_time", msg);
 
-      snprintf (msg, 50, "%f",     WORTH_WHILE);
-      mqtt_client.publish("House/debug_worth_while", msg);      
+      //snprintf (msg, 50, "%f",     WORTH_WHILE);
+      //mqtt_client.publish("House/debug_worth_while", msg);      
 
 
 //      snprintf (msg, 50, "%d", ESP.getMaxFreeBlockSize());
@@ -613,46 +620,46 @@ void loop() {
       
       
     }
-    debugD("@O");
-    DisplayDebug("@O");
+    //debugD("@O");
+    //DisplayDebug("@O");
 
    
     // Switch Immersion Heater on/off dependent on threshold.
-    if(1){
-      // Sonoff on off control via http get
-      if (emon1.realPower < power_threshold ){
-        Serial.println("On");
-        SonoffSend(1);
-        immersion_header_on=true;
-      } else{
-        Serial.println("Off");
-        SonoffSend(0);
-        immersion_header_on=false;
-      }
-    }
-    debugD("@P");
-    DisplayDebug("@P");
+    //if(1){
+    //  // Sonoff on off control via http get
+    //  if (emon1.realPower < power_threshold ){
+    //    Serial.println("On");
+    //    SonoffSend(1);
+    //    immersion_header_on=true;
+    //  } else{
+    //    Serial.println("Off");
+    //    SonoffSend(0);
+    //    immersion_header_on=false;
+    //  }
+    //}
+    //debugD("@P");
+    //DisplayDebug("@P");
 
-    {
-      int hours = timeClient.getHours();
-      int minutes = timeClient.getMinutes();
-      
-      if (hours==0 && ( minutes==0 or minutes==1)   )
-      {
-        //circular_buffer.clear();
-        circular_buffer_immersion.clear();
-        export_kwh=0;
-        import_kwh=0;
-
-      }
-      
-    }
-    debugD("@Q");
-    DisplayDebug("@Q");
+    //{
+    //  int hours = timeClient.getHours();
+    //  int minutes = timeClient.getMinutes();
+    //  
+    //  if (hours==0 && ( minutes==0 or minutes==1)   )
+    //  {
+    //    //circular_buffer.clear();
+    //    circular_buffer_immersion.clear();
+    //    export_kwh=0;
+    //    import_kwh=0;
+//
+    //  }
+    //  
+    //}
+    //debugD("@Q");
+    //DisplayDebug("@Q");
 
   }
-  debugD("@R");
-  DisplayDebug("@R");
+  //debugD("@R");
+  //DisplayDebug("@R");
 
 }
 
