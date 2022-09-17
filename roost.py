@@ -29,6 +29,8 @@ immersion_on = 0
 immersion_time = 0
 excess_power=0
 temperature_change=0
+plug1_power=350       # dehumifiier
+plug1_on=0
 
 def TemperatureChange(t):
     TemperatureChange.log.append(t)
@@ -38,9 +40,16 @@ def TemperatureChange(t):
 TemperatureChange.log=[]
 
 def ExcessPower():
-    global immersion_on, immersion_time,excess_power
-    
+    global excess_power
+    global immersion_on, immersion_time
+    global plug1_on, plug1_power
+
     excess_power=0
+    if plug1_on==0:
+        excess_power = -plug1_power
+    else:
+        excess_power= -power + plug1_power
+
     if immersion_on==0:
         excess_power = -power
     else:
@@ -48,17 +57,38 @@ def ExcessPower():
 
     print("Excess_power=", excess_power)
 
-    if excess_power > IMMERSION_POWER:
+    if excess_power > (IMMERSION_POWER + plug1_power):  # Everything ON
+        print("Immersion ON")
+        immersion_on = 1
+        client.publish("cmnd/sonoff/POWER", "ON");        
+        immersion_time+=0.5
+        print("plug1 ON")
+        client.publish("cmnd/plug1/POWER", "ON");      
+        plug1_on=1  
+
+    elif excess_power > IMMERSION_POWER:
         print("Immersion ON")
         immersion_on = 1
         client.publish("cmnd/sonoff/POWER", "ON");        
         immersion_time+=0.5
 
+        print("plug1 OFF")
+        client.publish("cmnd/plug1/POWER", "OFF");        
+        plug1_on=0
+
+    elif excess_power > plug1_power:
+        print("Immersion OFF")
+        immersion_on = 0
+        client.publish("cmnd/sonoff/POWER", "OFF");        
+
+        print("plug1 ON")
+        client.publish("cmnd/plug1/POWER", "ON");        
+        plug1_on=1
+
     else:
         print("Immersion OFF")
         immersion_on = 0
         client.publish("cmnd/sonoff/POWER", "OFF");
-
 
     # 2200 = 1200+1000    # Immersion ON
     # 2200 = 2200+0       # Immersion OFF
@@ -96,11 +126,14 @@ def ExcessPower():
 
 def DailyLog():
     global energy,power,temperature,energy_import, energy_export,samples,immersion_time,immersion_on
-    if samples==1 : #120:
+    if samples==120:
         print("MIDNIGHT SAVING TOTALS")
         f = open("log.csv", "a")
-        f.write("%s, %d , %.4f , %.4f , %.4f , %.1f , %d\n"  %(time.asctime(), time.time(), energy ,energy_import ,energy_export,temperature,immersion_on) )
+        f.write("%s, %d , %.4f , %.4f , %.4f , %.1f , %d , %d\n" 
+                 %(time.asctime(), time.time(), energy ,energy_import ,
+                   energy_export,temperature,immersion_on,immersion_time) )
         f.close()
+        samples=0
     
     # Check for midnight
     if samples>0 and time.strftime("%H", time.gmtime()) =="00" :  
@@ -117,7 +150,9 @@ def DailyLog():
 def on_message(client, userdata, message):
     print()
     print("message.topic=",message.topic)
-    global energy,power,temperature,energy_import, energy_export,samples,immersion_time,excess_power,temperature_change
+    global energy,power,temperature
+    global energy_import, energy_export,samples
+    global immersion_time,excess_power,temperature_change
 
     #print("message received " ,str(message.payload.decode("utf-8")))
     #print("message topic=",message.topic)
@@ -135,7 +170,8 @@ def on_message(client, userdata, message):
         else:
            energy_export -= instant_energy
 
-        print("energy=%.4f import=%.4f export=%.4f "  %(energy ,energy_import ,energy_export) )
+        print("energy=%.4f import=%.4f export=%.4f immersiontime=%d  " 
+                %(energy ,energy_import ,energy_export,immersion_time) )
         ExcessPower()
         client.publish("roost/version",            VERSION)
         client.publish("roost/power",              str(power))
@@ -146,6 +182,8 @@ def on_message(client, userdata, message):
         client.publish("roost/temperature",        str(temperature))
         client.publish("roost/excess_power",       str(excess_power))
         client.publish("roost/temperature_change", str(temperature_change))
+        client.publish("roost/immersion_on",       str(immersion_on))
+        client.publish("roost/plug1_on",           str(plug1_on))
         
         DailyLog()
 
@@ -157,14 +195,24 @@ def on_message(client, userdata, message):
        print("temperature", temperature)
        temperature_change=TemperatureChange(temperature)
 
-    if message.topic=="cmnd/sonoff/POWER":
+    if message.topic=="tele/plug1/SENSOR":
+        global plug1_power
+        data=json.loads(str(message.payload.decode("utf-8")))
+        #print(data)
+        if data["ENERGY"]["Power"] > 0:
+            plug1_power=data["ENERGY"]["Power"]
+        print("plug1_power=", data["ENERGY"]["Power"])
 
-        print("DEBUG ", str(message.payload.decode("utf-8")) )
-        global immersion_on
-        if str(message.payload.decode("utf-8"))=="ON":
-            immersion_on=1
-        if str(message.payload.decode("utf-8"))=="OFF":
-            immersion_on=0
+        
+
+    #if message.topic=="cmnd/sonoff/POWER":
+    #
+    #    print("DEBUG ", str(message.payload.decode("utf-8")) )
+    #    global immersion_on
+    #    if str(message.payload.decode("utf-8"))=="ON":
+    #        immersion_on=1
+    #    if str(message.payload.decode("utf-8"))=="OFF":
+    #        immersion_on=0
 
 
 
@@ -178,7 +226,10 @@ print("Roost connecting to", MQTT_ADDRESS )
 client.connect(MQTT_ADDRESS) #connect to broker
 client.loop_start() #start the loop
 
-topics=["tele/sonoff/SENSOR","House/Power" ]# , "cmnd/sonoff/POWER"]
+topics=[# "#",
+        "tele/sonoff/SENSOR",
+        "tele/plug1/SENSOR", 
+        "House/Power" ]# , "cmnd/sonoff/POWER"]
 for topic in topics:
     print("Subscribing to" , topic)
     client.subscribe(topic)
