@@ -89,6 +89,9 @@ def ExcessPower():
         print("Immersion OFF")
         immersion_on = 0
         client.publish("cmnd/sonoff/POWER", "OFF");
+        print("plug1 OFF")
+        client.publish("cmnd/plug1/POWER", "OFF");        
+        plug1_on=0
 
     # 2200 = 1200+1000    # Immersion ON
     # 2200 = 2200+0       # Immersion OFF
@@ -153,7 +156,8 @@ def on_message(client, userdata, message):
     global energy,power,temperature
     global energy_import, energy_export,samples
     global immersion_time,excess_power,temperature_change
-
+    global plug1_power, plug1_on
+    
     #print("message received " ,str(message.payload.decode("utf-8")))
     #print("message topic=",message.topic)
     #print("message qos=",message.qos)
@@ -184,6 +188,8 @@ def on_message(client, userdata, message):
         client.publish("roost/temperature_change", str(temperature_change))
         client.publish("roost/immersion_on",       str(immersion_on))
         client.publish("roost/plug1_on",           str(plug1_on))
+        client.publish("roost/plug1_power",        str(plug1_power))
+        
         
         DailyLog()
 
@@ -196,12 +202,14 @@ def on_message(client, userdata, message):
        temperature_change=TemperatureChange(temperature)
 
     if message.topic=="tele/plug1/SENSOR":
-        global plug1_power
+
         data=json.loads(str(message.payload.decode("utf-8")))
         #print(data)
         if data["ENERGY"]["Power"] > 0:
             plug1_power=data["ENERGY"]["Power"]
-        print("plug1_power=", data["ENERGY"]["Power"])
+        else:    
+            plug1_power *= 0.9    
+        print("plug1_power=", data["ENERGY"]["Power"],plug1_power) 
 
         
 
