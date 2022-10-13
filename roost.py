@@ -57,6 +57,7 @@ def ExcessPower():
 
     print("Excess_power=", excess_power)
 
+    
     if excess_power > (IMMERSION_POWER + plug1_power):  # Everything ON
         print("Immersion ON")
         immersion_on = 1
@@ -66,7 +67,7 @@ def ExcessPower():
         client.publish("cmnd/plug1/POWER", "ON");      
         plug1_on=1  
 
-    elif excess_power > IMMERSION_POWER:
+    elif excess_power > IMMERSION_POWER:  # Only Immersion Heater
         print("Immersion ON")
         immersion_on = 1
         client.publish("cmnd/sonoff/POWER", "ON");        
@@ -76,7 +77,7 @@ def ExcessPower():
         client.publish("cmnd/plug1/POWER", "OFF");        
         plug1_on=0
 
-    elif excess_power > plug1_power:
+    elif excess_power > plug1_power:  # Only Plug1
         print("Immersion OFF")
         immersion_on = 0
         client.publish("cmnd/sonoff/POWER", "OFF");        
@@ -85,7 +86,7 @@ def ExcessPower():
         client.publish("cmnd/plug1/POWER", "ON");        
         plug1_on=1
 
-    else:
+    else:   # Nothing, Alll off.
         print("Immersion OFF")
         immersion_on = 0
         client.publish("cmnd/sonoff/POWER", "OFF");
@@ -162,8 +163,17 @@ def on_message(client, userdata, message):
     #print("message topic=",message.topic)
     #print("message qos=",message.qos)
     #print("message retain flag=",message.retain)
-    if message.topic=="House/Power" :
-        power = float(str(message.payload.decode("utf-8")))
+
+   
+    if message.topic=="tele/tasmota_FE4918/SENSOR":
+        #print (str(message.payload.decode("utf-8")))
+        data=json.loads(str(message.payload.decode("utf-8")))
+        print(data)
+        power=data["PowerMonitor"]
+        print(power)
+
+#    if message.topic=="House/Power" :
+#        power = float(str(message.payload.decode("utf-8")))
         print("power=",power)
 
         instant_energy = (power/1000)/120 # watts to kw and 120 updates per hour (30 seconds)
@@ -205,10 +215,15 @@ def on_message(client, userdata, message):
 
         data=json.loads(str(message.payload.decode("utf-8")))
         #print(data)
-        if data["ENERGY"]["Power"] > 0:
+
+        if plug1_on==1:
             plug1_power=data["ENERGY"]["Power"]
         else:    
             plug1_power *= 0.9    
+#            if data["ENERGY"]["Power"] > 0:
+#                plug1_power=data["ENERGY"]["Power"]
+#            else:    
+#                plug1_power *= 0.9    
         print("plug1_power=", data["ENERGY"]["Power"],plug1_power) 
 
         
@@ -237,6 +252,7 @@ client.loop_start() #start the loop
 topics=[# "#",
         "tele/sonoff/SENSOR",
         "tele/plug1/SENSOR", 
+        "tele/tasmota_FE4918/SENSOR",
         "House/Power" ]# , "cmnd/sonoff/POWER"]
 for topic in topics:
     print("Subscribing to" , topic)
