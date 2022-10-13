@@ -171,7 +171,7 @@ void EnergyMonitor::calcVI(void)
 
 
   start = millis();
-  const int array_size=40; // tune this to get total sampling=20ms 1/50Hz
+  const int array_size=50; // tune this to get total sampling=20ms 1/50Hz
   uint16 V_array[array_size];
   uint16 I_array[array_size];
   for(int i=0;i<array_size;i++){
@@ -189,6 +189,11 @@ void EnergyMonitor::calcVI(void)
   //-------------------------------------------------------------------------------------------------------------------------
   // 2) Main measurement loop
   //-------------------------------------------------------------------------------------------------------------------------
+  // Start the Lowpass filter at a close starting place
+  if (offsetV==0)
+    offsetV=V_array[0];
+  if (offsetI==0)
+    offsetI=I_array[0];  
   start = millis();
   
   unsigned long delta_ms;
@@ -321,6 +326,22 @@ void EnergyMonitor::calcVI(void)
   AddLog(LOG_LEVEL_DEBUG, PSTR("EnergyMonitor::calcVI realPower     = %f"),realPower );
   AddLog(LOG_LEVEL_DEBUG, PSTR("EnergyMonitor::calcVI apparentPower = %f"),apparentPower );
   AddLog(LOG_LEVEL_DEBUG, PSTR("EnergyMonitor::calcVI powerFactor   = %f"),powerFactor );
+  AddLog(LOG_LEVEL_DEBUG, PSTR("EnergyMonitor::calcVI Vrms          = %f"),Vrms );
+  AddLog(LOG_LEVEL_DEBUG, PSTR("EnergyMonitor::calcVI Irms          = %f"),Irms );
+
+  if(0){
+    String str_voltage="";
+    String str_current="";
+    
+    for(int i=0;i<array_size;i++){
+      str_voltage+=String(V_array[i],DEC);
+      str_voltage+=" ";
+      str_current+=String(I_array[i],DEC);
+      str_current+=" ";
+    }
+    AddLog(LOG_LEVEL_DEBUG, PSTR("EnergyMonitor::calcVI Voltage=%s"),str_voltage.c_str()); 
+    AddLog(LOG_LEVEL_DEBUG, PSTR("EnergyMonitor::calcVI Current=%s"),str_current.c_str()); 
+  }  
 
   //Reset accumulators
   sumV = 0;
@@ -335,10 +356,6 @@ void EnergyMonitor::calcVI(void)
 EnergyMonitor emon1;  
 
 
-
-
-void As608Init(void) {
-}
 
 
 /*********************************************************************************************\
@@ -374,14 +391,17 @@ bool Xsns100(uint8_t function) {
     switch (function) {
       case FUNC_EVERY_SECOND:
         static int count=0;
-        if(count%30==0){
+        if(count%10==0){
           emon1.calcVI();
         }
         count++;
         break;
       case FUNC_JSON_APPEND:
         AddLog(LOG_LEVEL_DEBUG, PSTR("AMC debug log FUNC_JSON_APPEND, %f "),emon1.realPower);
-        ResponseAppend_P(PSTR(",\"PowerMonitor\": %f "),emon1.realPower);//   {\"" D_JSON_ECO2 "\":%d,\"" D_JSON_TVOC "\":%d}"), 123,456);
+        ResponseAppend_P(PSTR(",\"PowerMonitor\": %f ,\"Vrms\": %f ,\"ApparentPower\": %f "),
+            emon1.realPower ,
+            emon1.Vrms,
+            emon1.apparentPower );//   {\"" D_JSON_ECO2 "\":%d,\"" D_JSON_TVOC "\":%d}"), 123,456);
         break;
 
       //case FUNC_COMMAND:
