@@ -71,14 +71,15 @@ def ExcessPower():
         client.publish("cmnd/plug1/POWER", "OFF");        
         plug1_on=0
 
+
 def DailyLog():
-    global energy,power,temperature,energy_import, energy_export,samples,immersion_time,immersion_on
+    global energy,power,temperature_top,energy_import, energy_export,samples,immersion_time,immersion_on
     if samples==120:
         print("MIDNIGHT SAVING TOTALS")
         f = open("log.csv", "a")
         f.write("%s, %d , %.4f , %.4f , %.4f , %.1f , %d , %d\n" 
                  %(time.asctime(), time.time(), energy ,energy_import ,
-                   energy_export,temperature,immersion_on,immersion_time) )
+                   energy_export,temperature_top,immersion_on,immersion_time) )
         f.close()
         samples=0
     
@@ -99,14 +100,13 @@ def on_message(client, userdata, message):
     print("message.topic=",message.topic)
     global energy,power
     global energy_import, energy_export,samples
-    global immersion_time,immersion_power
+    global immersion_time,immersion_energy_today
     global excess_power
     global plug1_power, plug1_on
     global plug2_power, plug2_on
     global temperature_top ,temperature_bottom
-
+   
     if message.topic=="tele/tasmota_FE4918/SENSOR":
-        #print (str(message.payload.decode("utf-8")))
         data=json.loads(str(message.payload.decode("utf-8")))
         print(data)
         power=data["PowerMonitor"]
@@ -123,21 +123,21 @@ def on_message(client, userdata, message):
         print("energy=%.4f import=%.4f export=%.4f immersiontime=%d  " 
                 %(energy ,energy_import ,energy_export,immersion_time) )
         ExcessPower()
-        client.publish("roost/version",            VERSION)
-        client.publish("roost/power",              str(power))
-        client.publish("roost/energy",             str(energy))
-        client.publish("roost/energy_import",      str(energy_import))
-        client.publish("roost/energy_export",      str(energy_export))
-        client.publish("roost/immersion_time",     str(immersion_time/60))
-        client.publish("roost/hot_water_tank_top",   str(temperature_top))
-        client.publish("roost/hot_water_tank_bottom",str(temperature_bottom))
-        client.publish("roost/excess_power",       str(excess_power))
-        client.publish("roost/immersion_on",       str(immersion_on))
-        client.publish("roost/plug1_on",           str(plug1_on))
-        client.publish("roost/plug1_power",        str(plug1_power))
+        client.publish("roost/version",                 VERSION)
+        client.publish("roost/power",                   str(power))
+        client.publish("roost/energy",                  str(energy))
+        client.publish("roost/energy_import",           str(energy_import))
+        client.publish("roost/energy_export",           str(energy_export))
+        client.publish("roost/immersion_time",          str(immersion_time/60))
+        client.publish("roost/immersion_energy_today",  str(immersion_energy_today))
+        client.publish("roost/hot_water_tank_top",      str(temperature_top))
+        client.publish("roost/hot_water_tank_bottom",   str(temperature_bottom))
+        client.publish("roost/excess_power",            str(excess_power))
+        client.publish("roost/immersion_on",            str(immersion_on))
+        client.publish("roost/plug1_on",                str(plug1_on))
+        client.publish("roost/plug1_power",             str(plug1_power))
         
         DailyLog()
-
 
     if message.topic=="tele/tasmota_0FC0E1/SENSOR":  # Water Tank temperature.
        data=json.loads(str(message.payload.decode("utf-8")))
@@ -154,7 +154,6 @@ def on_message(client, userdata, message):
         print("plug1_energy_today=", immersion_energy_today) 
         
 
-
 ########################################
 
 print("Roost connecting...")
@@ -165,11 +164,13 @@ print("Roost connecting to", MQTT_ADDRESS )
 client.connect(MQTT_ADDRESS) #connect to broker
 client.loop_start() #start the loop
 
-topics=[
+topics=[# "#",
         "tele/plug1/SENSOR",           # Immersion heater
         "tele/plug2/SENSOR",           # Car/Dehumidifier
         "tele/tasmota_FE4918/SENSOR",  # House Mains power.
         "tele/tasmota_0FC0E1/SENSOR",  # Water Tank temperature.
+
+        #"House/Power" # , "cmnd/sonoff/POWER"]
         ]
 for topic in topics:
     print("Subscribing to" , topic)
