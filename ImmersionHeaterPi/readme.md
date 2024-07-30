@@ -8,4 +8,8 @@ sudo apt install python3-rpi.gpio
 sudo apt install python3-pip
 sudo apt install python3-smbus
 sudo raspi-config # Select I2C from the interfaces.
+
+# Check i2c is connected
+sudo i2cdetect -y 0
+
 ```
