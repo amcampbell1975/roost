@@ -5,24 +5,21 @@ import sys
 import logging
 from logging.handlers import RotatingFileHandler
 import time
-
-#import paho-mqtt
+import SCR
 import paho.mqtt.client as mqtt #sudo apt install python3-paho-mqtt
+
+############################
+TARGET=-50
+LOAD=1100
+Kp=0.5
+############################
+
 
 logger = logging.getLogger('mylogger')
 logging.basicConfig(level=logging.INFO)
 handler = RotatingFileHandler('/tmp/roost.log', maxBytes=10000, backupCount=3) 
 logger.addHandler(handler)
-
 logger.setLevel(logging.DEBUG)
-
-#libdir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'lib')
-#if os.path.exists(libdir):
-#    sys.path.append(libdir)
-
-import SCR
-
-import paho.mqtt.client as mqtt
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
@@ -41,30 +38,28 @@ def on_message(client, userdata, msg):
     p=p[2:-1] # skip the first 2 and last chars b'1.234'
     power=float(p)
     
-    TARGET=-50
-    TARGET=800
-    Kp=0.5
     delta_power= TARGET - power	  # scr.load_power
 
 
     logger.info("The power            = %f" %(power))
+    logger.info("The Target power     = %f" %(TARGET))
     logger.info("The scr.load_power   = %f" %(scr.load_power))
     logger.info("The delta_power      = %f" %(delta_power))
 
     scr.load_power += delta_power*Kp
     if scr.load_power<0 :
         scr.load_power=0
-    if scr.load_power>800 :
-        scr.load_power=800
+    if scr.load_power>LOAD :
+        scr.load_power=LOAD
     logger.info("New scr.load_power   = %f" %(scr.load_power))
-    logger.info("New angle  =%f" %((scr.load_power/800) * 180) )
+    logger.info("New angle  =%f" %((scr.load_power/LOAD) * 180) )
 
     if scr.load_power<1:
         scr.ChannelDisable(2)
     else:
         scr.ChannelEnable(2)
 
-    scr.VoltageRegulation(2, int((scr.load_power/800) * 180) )
+    scr.VoltageRegulation(2, int((scr.load_power/LOAD) * 180) )
     client.publish("hotwater/power", str(scr.load_power))
 
 
