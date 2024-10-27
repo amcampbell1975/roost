@@ -4,7 +4,7 @@ import time
 import json
 import logging
 
-VERSION="1.2"
+VERSION="1.3"
 
 IMMERSION_POWER               = 1000
 
@@ -23,22 +23,28 @@ energy_import = 0
 power=0
 temperature_top   =0
 temperature_bottom=0
+temperature_upper =0
+temperature_lower =0
 immersion_on = 0
 immersion_time = 0
 immersion_energy_today = 0
+immersion_power = 0
 
 excess_power=0
 
 plug1_power=1000       # Immersion heater.
 plug1_on=0
+plug1_energy_today=0
 
 plug2_power=350       # dehumifiier
 plug2_on=0
+plug2_energy_today=0
 
 def ExcessPower():
     global excess_power
     global immersion_on, immersion_time
-    global plug1_on, plug1_power
+    global plug1_on, plug1_power,plug1_energy_today
+    global plug2_on, plug2_power,plug2_energy_today
 
     excess_power=0
     if plug1_on==0:
@@ -100,11 +106,12 @@ def on_message(client, userdata, message):
     print("message.topic=",message.topic)
     global energy,power
     global energy_import, energy_export,samples
-    global immersion_time,immersion_energy_today
+    global immersion_time,immersion_energy_today,immersion_power
     global excess_power
-    global plug1_power, plug1_on
-    global plug2_power, plug2_on
+    global plug1_on, plug1_power,plug1_energy_today
+    global plug2_on, plug2_power,plug2_energy_today
     global temperature_top ,temperature_bottom
+    global temperature_upper ,temperature_lower
    
     if message.topic=="tele/tasmota_FE4918/SENSOR":
         data=json.loads(str(message.payload.decode("utf-8")))
@@ -122,37 +129,55 @@ def on_message(client, userdata, message):
 
         print("energy=%.4f import=%.4f export=%.4f immersiontime=%d  " 
                 %(energy ,energy_import ,energy_export,immersion_time) )
-        ExcessPower()
+        #ExcessPower()
         client.publish("roost/version",                 VERSION)
         client.publish("roost/power",                   str(power))
         client.publish("roost/energy",                  str(energy))
         client.publish("roost/energy_import",           str(energy_import))
         client.publish("roost/energy_export",           str(energy_export))
-        client.publish("roost/immersion_time",          str(immersion_time/60))
-        client.publish("roost/immersion_energy_today",  str(immersion_energy_today))
         client.publish("roost/hot_water_tank_top",      str(temperature_top))
+        client.publish("roost/hot_water_tank_upper",    str(temperature_upper))
+        client.publish("roost/hot_water_tank_lower",    str(temperature_lower))
         client.publish("roost/hot_water_tank_bottom",   str(temperature_bottom))
         client.publish("roost/excess_power",            str(excess_power))
         client.publish("roost/immersion_on",            str(immersion_on))
+        client.publish("roost/immersion_power",         str(immersion_power))
+        client.publish("roost/immersion_time",          str(immersion_time/60))
+        client.publish("roost/immersion_energy_today",  str(immersion_energy_today))
         client.publish("roost/plug1_on",                str(plug1_on))
         client.publish("roost/plug1_power",             str(plug1_power))
-        
+        client.publish("roost/plug2_on",                str(plug2_on))
+        client.publish("roost/plug2_power",             str(plug2_power))
         DailyLog()
 
     if message.topic=="tele/tasmota_0FC0E1/SENSOR":  # Water Tank temperature.
-       data=json.loads(str(message.payload.decode("utf-8")))
-       print(data)
-       temperature_bottom=data["DS18B20-1"]["Temperature"]
-       temperature_top   =data["DS18B20-2"]["Temperature"]
-
+       #print("DEBUG" , str(message.payload.decode("utf-8")) )
+       try:
+           data=json.loads(str(message.payload.decode("utf-8")))
+           print(data)
+           temperature_bottom=data["DS18B20-1"]["Temperature"]
+           temperature_top   =data["DS18B20-2"]["Temperature"]
+           temperature_lower =data["DS18B20-3"]["Temperature"]
+           temperature_upper =data["DS18B20-4"]["Temperature"]
+       except:
+           print("Exception warning unable to process sensor data")
        
     if message.topic=="tele/plug1/SENSOR":
         data=json.loads(str(message.payload.decode("utf-8")))
         plug1_power=data["ENERGY"]["Power"]
-        immersion_energy_today=data["ENERGY"]["Today"]
+        plug1_energy_today=data["ENERGY"]["Today"]
         print("plug1_power       =", plug1_power) 
-        print("plug1_energy_today=", immersion_energy_today) 
-        
+        print("plug1_energy_today=", plug1_energy_today) 
+
+
+    if message.topic=="tele/Plug2/SENSOR":
+        data=json.loads(str(message.payload.decode("utf-8")))
+        plug2_power=data["ENERGY"]["Power"]
+        plug2_energy_today=data["ENERGY"]["Today"]
+        print("plug2_power       =", plug2_power) 
+        print("plug2_energy_today=", plug2_energy_today) 
+        immersion_power       =plug2_power
+        immersion_energy_today=plug2_energy_today
 
 ########################################
 
@@ -166,7 +191,7 @@ client.loop_start() #start the loop
 
 topics=[# "#",
         "tele/plug1/SENSOR",           # Immersion heater
-        "tele/plug2/SENSOR",           # Car/Dehumidifier
+        "tele/Plug2/SENSOR",           # Car/Dehumidifier
         "tele/tasmota_FE4918/SENSOR",  # House Mains power.
         "tele/tasmota_0FC0E1/SENSOR",  # Water Tank temperature.
 
