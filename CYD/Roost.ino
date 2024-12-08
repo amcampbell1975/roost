@@ -63,6 +63,7 @@ float hot_water_tank_bottom=0;
 float hotwater_minutes=0;
 float hotwater_kwh=0;
 float immersion_on=0;
+float immersion_power=0;
 
 
 float temps_top[320];
@@ -189,7 +190,7 @@ void PowersGraph(void){
     }
       
     h= map(immersion_powers[i],-4000,4000,G_HEIGHT,0  );
-    if (immersion_powers[i]>0){
+    if (immersion_powers[i]>10){
       tft.drawPixel(i,h , TFT_YELLOW);
       tft.drawPixel(i,h+1 , TFT_YELLOW);
     }   
@@ -325,9 +326,8 @@ void HotWater(float top_value,float upper_value, float lower_value, float bottom
 
   {
     sprite_tank.setTextColor(TFT_WHITE, TFT_BLACK );
-    sprite_tank.drawString(String(hotwater_minutes)+" Min", 2,166   , 2);
-    sprite_tank.drawString(String(hotwater_kwh    )+" kWh", 2,166+13, 2);
-
+    sprite_tank.drawString(String(int(hotwater_kwh*1000) )+" Wh", 2,166+0, 2);
+    sprite_tank.drawString(String(int(immersion_power) )+" W"  , 2,166+13, 2);
 
     sprite_tank.drawRect(0, 0, 60,41*4,TFT_WHITE );
   }
@@ -339,7 +339,7 @@ void HotWater(float top_value,float upper_value, float lower_value, float bottom
 
 void Dial( float value){
   int int_value=int(value+0.5);
-  int angle=map(int_value, -2000, 2000, -135, 135);
+  int angle=map(int_value, -3000, 3000, -135, 135);
   angle = constrain(angle, -135, 135);
 
   //Background
@@ -378,7 +378,7 @@ void Dial( float value){
 
 void setup() {
   Serial.begin(115200);
-  Serial.printf("Roost version 1.0/n");
+  Serial.printf("Roost version 1.1/n");
 
   tft.init();
   tft.setRotation(1); //This is the display in landscape
@@ -392,7 +392,7 @@ void setup() {
   sprite_power.setColorDepth(8);
   sprite_power.createSprite(160, 160);
   sprite_tank.setColorDepth(8);
-  sprite_tank.createSprite(60, 200);
+  sprite_tank.createSprite(60, 220);
 
   sprite_energy.setColorDepth(8);
   sprite_energy.createSprite(160,30);
@@ -528,11 +528,20 @@ void callback(char* topic, byte* message, unsigned int length) {
     Serial.print("Temp=");
     Serial.println(hot_water_tank_top);
 
-  }else if(Topic=="roost/immersion_on"){
-    immersion_on = Message.toFloat();
-    AddNewImmersion(immersion_on*1000);
-    Serial.print("Immersion on=");
-    Serial.println(immersion_on);
+  // }else if(Topic=="roost/immersion_on"){
+  //   immersion_on = Message.toFloat();
+  //   AddNewImmersion(immersion_on*1000);
+  //   Serial.print("Immersion on=");
+  //   Serial.println(immersion_on);
+  }else if(Topic=="roost/immersion_power"){
+    immersion_power = Message.toFloat();
+    AddNewImmersion(immersion_power);
+    if(immersion_power>0) 
+      immersion_on=1; 
+    else
+      immersion_on=0; 
+    Serial.print("Immersion power");
+    Serial.println(immersion_power);
   }else if(Topic=="roost/hot_water_tank_bottom"){
     hot_water_tank_bottom = Message.toFloat();
     AddNewHotWaterBottom(hot_water_tank_bottom);
@@ -628,6 +637,7 @@ void reconnect() {
       client.subscribe("roost/immersion_time");
       client.subscribe("roost/immersion_energy_today");
       client.subscribe("roost/immersion_on");
+      client.subscribe("roost/immersion_power");
       client.subscribe("roost/energy");
       //timeClienty");
       
