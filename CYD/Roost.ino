@@ -104,7 +104,6 @@ void Ashp_Draw(float ashp_power, float ashp_energy_today){
     // sprite_ashp.drawString("ASHP" , 0,0, 2);
 
     sprite_ashp.pushImage(0, 0, icon_ashp_width, icon_ashp_height, icon_ashp);
-//  sprite_energy.fillRect(0,0,100,30,TFT_DARKGREY );
   
     //Serial.printf("Ashp width= %f\n",width);
     //float width= map(ashp_power,0,3500, 0,58  );
