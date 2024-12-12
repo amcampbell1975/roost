@@ -53,6 +53,8 @@ void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax = 255) {
 
 /////////////////////////////////////
 
+struct {
+
 int   plug_heater=1;
 float power      =0;
 float energy     =0;
@@ -66,6 +68,7 @@ float immersion_on=0;
 float immersion_power=0;
 float ashp_power=0;
 float ashp_energy_today=0;
+} latest_data;
 
 
 float temps_top[320];
@@ -291,10 +294,10 @@ void HotGraph(void){//float temperatures[10]){
     tft.drawPixel(i,h , TFT_WHITE); 
   }
   tft.setTextColor(TFT_WHITE, TFT_BLACK );
-  tft.drawString(String(hot_water_tank_top) ,   5,20,  2);
-  tft.drawString(String(hot_water_tank_upper),  5,60,  2);
-  tft.drawString(String(hot_water_tank_lower),  5,100, 2);
-  tft.drawString(String(hot_water_tank_bottom), 5,140, 2);
+  tft.drawString(String(latest_data.hot_water_tank_top) ,   5,20,  2);
+  tft.drawString(String(latest_data.hot_water_tank_upper),  5,60,  2);
+  tft.drawString(String(latest_data.hot_water_tank_lower),  5,100, 2);
+  tft.drawString(String(latest_data.hot_water_tank_bottom), 5,140, 2);
 
   tft.drawFastHLine( 0, G_HEIGHT+1,  320, TFT_WHITE);
 
@@ -372,13 +375,13 @@ void HotWater(float top_value,float upper_value, float lower_value, float bottom
 
   {
     sprite_tank.setTextColor(TFT_WHITE, TFT_BLACK );
-    sprite_tank.drawString(String(float(immersion_power/1000.0  )) + " KW"  , 2,166+0 , 2);
-    sprite_tank.drawString(String(float(hotwater_kwh            )) + " KWh", 2,166+13, 2);
+    sprite_tank.drawString(String(float(latest_data.immersion_power/1000.0  )) + " KW"  , 2,166+0 , 2);
+    sprite_tank.drawString(String(float(latest_data.hotwater_kwh            )) + " KWh", 2,166+13, 2);
 
 
     sprite_tank.drawRect(0, 0, 60,41*4,TFT_WHITE );
   }
-  if(plug_heater==1)
+  if(latest_data.plug_heater==1)
     sprite_tank.pushImage(15, 70,icon_plug_width, icon_plug_height, icon_plug);
 
   sprite_tank.pushSprite(250, 20, TFT_TRANSPARENT);
@@ -567,15 +570,15 @@ void callback(char* topic, byte* message, unsigned int length) {
   Serial.printf("MQTT '%s' '%s'\n",Topic.c_str(),Message.c_str());
 
   if(Topic=="roost/power"){
-    power=Message.toFloat();
-    AddNewPower(power);
+    latest_data.power=Message.toFloat();
+    AddNewPower(latest_data.power);
   }else if(Topic=="roost/plug1_on"){
-    plug_heater=Message.toInt();
+    latest_data.plug_heater=Message.toInt();
   }else if(Topic=="roost/hot_water_tank_top"){
-    hot_water_tank_top = Message.toFloat();
-    AddNewHotWaterTop(hot_water_tank_top);
+    latest_data.hot_water_tank_top = Message.toFloat();
+    AddNewHotWaterTop(latest_data.hot_water_tank_top);
     Serial.print("Temp=");
-    Serial.println(hot_water_tank_top);
+    Serial.println(latest_data.hot_water_tank_top);
 
   // }else if(Topic=="roost/immersion_on"){
   //   immersion_on = Message.toFloat();
@@ -583,53 +586,53 @@ void callback(char* topic, byte* message, unsigned int length) {
   //   Serial.print("Immersion on=");
   //   Serial.println(immersion_on);
   }else if(Topic=="roost/immersion_power"){
-    immersion_power = Message.toFloat();
-    AddNewImmersion(immersion_power);
-    if(immersion_power>0) 
-      immersion_on=1; 
+    latest_data.immersion_power = Message.toFloat();
+    AddNewImmersion(latest_data.immersion_power);
+    if(latest_data.immersion_power>0) 
+      latest_data.immersion_on=1; 
     else
-      immersion_on=0; 
+      latest_data.immersion_on=0; 
     Serial.print("Immersion power");
-    Serial.println(immersion_power);
+    Serial.println(latest_data.immersion_power);
   }else if(Topic=="roost/hot_water_tank_bottom"){
-    hot_water_tank_bottom = Message.toFloat();
-    AddNewHotWaterBottom(hot_water_tank_bottom);
+    latest_data.hot_water_tank_bottom = Message.toFloat();
+    AddNewHotWaterBottom(latest_data.hot_water_tank_bottom);
     Serial.print("Temp=");
-    Serial.println(hot_water_tank_bottom);
+    Serial.println(latest_data.hot_water_tank_bottom);
   }else if(Topic=="roost/immersion_time"){
-    hotwater_minutes = Message.toFloat()*60;
+    latest_data.hotwater_minutes = Message.toFloat()*60;
     Serial.print("hotwater_minutes=");
-    Serial.println(hotwater_minutes);
+    Serial.println(latest_data.hotwater_minutes);
   }else if(Topic=="roost/hot_water_tank_upper"){
-    hot_water_tank_upper = Message.toFloat();
-    AddNewHotWaterUpper(hot_water_tank_upper);
+    latest_data.hot_water_tank_upper = Message.toFloat();
+    AddNewHotWaterUpper(latest_data.hot_water_tank_upper);
     Serial.print("Temp=");
-    Serial.println(hot_water_tank_upper);
+    Serial.println(latest_data.hot_water_tank_upper);
   }else if(Topic=="roost/hot_water_tank_lower"){
-    hot_water_tank_lower = Message.toFloat();
-    AddNewHotWaterLower(hot_water_tank_lower);
+    latest_data.hot_water_tank_lower = Message.toFloat();
+    AddNewHotWaterLower(latest_data.hot_water_tank_lower);
     Serial.print("Temp=");
-    Serial.println(hot_water_tank_lower);
+    Serial.println(latest_data.hot_water_tank_lower);
   }else if(Topic=="roost/immersion_energy_today"){
-    hotwater_kwh = Message.toFloat();
+    latest_data.hotwater_kwh = Message.toFloat();
     Serial.print("hotwater_kwh=");
-    Serial.println(hotwater_kwh);
+    Serial.println(latest_data.hotwater_kwh);
 
     
   }else if(Topic=="roost/energy"){
-    energy = Message.toFloat();
+    latest_data.energy = Message.toFloat();
     Serial.print("energy=");
-    Serial.println(energy);
+    Serial.println(latest_data.energy);
   
   }else if(Topic=="roost/ashp_power"){
-    ashp_power = Message.toFloat();
+    latest_data.ashp_power = Message.toFloat();
     Serial.print("ashp_power=");
-    Serial.println(ashp_power);
+    Serial.println(latest_data.ashp_power);
   
   }else if(Topic=="roost/ashp_energy_today"){
-    ashp_energy_today = Message.toFloat();
+    latest_data.ashp_energy_today = Message.toFloat();
     Serial.print("ashp_energy_today=");
-    Serial.println(ashp_energy_today);
+    Serial.println(latest_data.ashp_energy_today);
   }
 
 
@@ -645,33 +648,19 @@ void callback(char* topic, byte* message, unsigned int length) {
     {
       tft.fillScreen(TFT_BLACK);
       ledcAnalogWrite(LEDC_CHANNEL_0, 255);
-      Dial(power);
-      HotWater(hot_water_tank_top,hot_water_tank_upper,hot_water_tank_lower,   hot_water_tank_bottom,hotwater_minutes );
-      Energy(energy);
-      Ashp_Draw(ashp_power ,  ashp_energy_today);
+      Dial(latest_data.power);
+      HotWater(latest_data.hot_water_tank_top,
+               latest_data.hot_water_tank_upper,
+               latest_data.hot_water_tank_lower,   
+               latest_data.hot_water_tank_bottom,
+               latest_data.hotwater_minutes );
+      Energy(latest_data.energy);
+      Ashp_Draw(latest_data.ashp_power ,  latest_data.ashp_energy_today);
     }else{
       ledcAnalogWrite(LEDC_CHANNEL_0, 0);
     }
   }
 
-  
-/*oo
-  // Feel free to add more if statements to control more GPIOs with MQTT
-
-  // If a message is received on the topic esp32/output, you check if the message is either "on" or "off". 
-  // Changes the output state according to the message
-  if (String(topic) == "esp32/output") {
-    Serial.print("Changing output to ");
-    if(messageTemp == "on"){
-      Serial.println("on");
-      digitalWrite(ledPin, HIGH);
-    }
-    else if(messageTemp == "off"){
-      Serial.println("off");
-      digitalWrite(ledPin, LOW);
-    }
-  }
-  */
 }
 
 void reconnect() {
@@ -744,10 +733,14 @@ void loop() {
         PowersGraph();
       }else if (screen_x<280){
         
-        Dial(power);
-        HotWater(hot_water_tank_top,hot_water_tank_upper,hot_water_tank_lower,  hot_water_tank_bottom,hotwater_minutes );
-        Ashp_Draw(ashp_power ,  ashp_energy_today);
-        Energy(energy);
+        Dial(latest_data.power);
+        HotWater(latest_data.hot_water_tank_top,
+                 latest_data.hot_water_tank_upper,
+                 latest_data.hot_water_tank_lower,  
+                 latest_data.hot_water_tank_bottom,
+                 latest_data.hotwater_minutes );
+        Ashp_Draw(latest_data.ashp_power ,  latest_data.ashp_energy_today);
+        Energy(latest_data.energy);
       }else{
           HotGraph();
       }   
