@@ -64,6 +64,8 @@ float hotwater_minutes=0;
 float hotwater_kwh=0;
 float immersion_on=0;
 float immersion_power=0;
+float ashp_power=0;
+float ashp_energy_today=0;
 
 
 float temps_top[320];
@@ -82,6 +84,7 @@ uint32_t water_temp_colour_scale[20];
 TFT_eSPI tft = TFT_eSPI();
 
 TFT_eSprite sprite_power = TFT_eSprite(&tft); 
+TFT_eSprite sprite_ashp = TFT_eSprite(&tft); 
 TFT_eSprite sprite_tank  = TFT_eSprite(&tft); 
 TFT_eSprite sprite_energy= TFT_eSprite(&tft); 
 
@@ -92,6 +95,50 @@ int limit(int in, int min, int max){
     return max;
   return in; 
 }
+
+void Ashp_Draw(float ashp_power, float ashp_energy_today){
+
+    Serial.printf("Ashp(%f %f)\n",ashp_power, ashp_energy_today);
+    //sprite_ashp.fillScreen(TFT_DARKGREY);
+    sprite_ashp.fillScreen(TFT_BLACK);
+    // sprite_ashp.drawString("ASHP" , 0,0, 2);
+
+    sprite_ashp.pushImage(0, 0, icon_ashp_width, icon_ashp_height, icon_ashp);
+//  sprite_energy.fillRect(0,0,100,30,TFT_DARKGREY );
+  
+    //Serial.printf("Ashp width= %f\n",width);
+    //float width= map(ashp_power,0,3500, 0,58  );
+    
+
+    uint16_t colour_bar[5]={TFT_GREENYELLOW,TFT_YELLOW,TFT_ORANGE,TFT_RED,TFT_RED};
+    
+    {
+      const float MAX_POWER=2000;
+      int colour_bar_index=map(ashp_power,0,MAX_POWER,0,5 );
+      colour_bar_index=constrain(colour_bar_index,0,4);
+      sprite_ashp.drawString(String(float(ashp_power/1000.0 )) + " KW" , 0,30+18, 2);
+      if(ashp_power> 100 )
+        sprite_ashp.fillCircle(21, 22, 15,colour_bar[colour_bar_index]);
+    }
+    
+    //width= map(ashp_energy_today,0,20, 0,58  );  
+    //sprite_ashp.fillRect(0,75,width,18,TFT_GREEN );
+
+    {
+      const float MAX_ENERGY=15;
+      float height= map(ashp_energy_today,0,MAX_ENERGY, 0,30  );  
+      height= constrain(height,0,30);
+      int colour_bar_index=map(ashp_energy_today,0,MAX_ENERGY,0,5 );
+      colour_bar_index=constrain(colour_bar_index,0,4);
+      sprite_ashp.fillRect(45,37-height,9,height,colour_bar[colour_bar_index] );
+      sprite_ashp.drawString(String(float(ashp_energy_today )) + " KWh" , 0,45+18, 2);
+    }
+
+  // sprite_tank.pushSprite(250, 20, TFT_TRANSPARENT);
+  sprite_ashp.pushSprite(180-2, 20, TFT_TRANSPARENT);
+}
+
+
 
 void Energy(float energy){
 
@@ -326,8 +373,9 @@ void HotWater(float top_value,float upper_value, float lower_value, float bottom
 
   {
     sprite_tank.setTextColor(TFT_WHITE, TFT_BLACK );
-    sprite_tank.drawString(String(int(hotwater_kwh*1000) )+" Wh", 2,166+0, 2);
-    sprite_tank.drawString(String(int(immersion_power) )+" W"  , 2,166+13, 2);
+    sprite_tank.drawString(String(float(immersion_power/1000.0  )) + " KW"  , 2,166+0 , 2);
+    sprite_tank.drawString(String(float(hotwater_kwh            )) + " KWh", 2,166+13, 2);
+
 
     sprite_tank.drawRect(0, 0, 60,41*4,TFT_WHITE );
   }
@@ -378,7 +426,7 @@ void Dial( float value){
 
 void setup() {
   Serial.begin(115200);
-  Serial.printf("Roost version 1.1/n");
+  Serial.printf("Roost version 1.2/n");
 
   tft.init();
   tft.setRotation(1); //This is the display in landscape
@@ -394,6 +442,9 @@ void setup() {
   sprite_tank.setColorDepth(8);
   sprite_tank.createSprite(60, 220);
 
+  sprite_ashp.setColorDepth(8);
+  sprite_ashp.createSprite(70, 100);
+
   sprite_energy.setColorDepth(8);
   sprite_energy.createSprite(160,30);
   
@@ -402,13 +453,11 @@ void setup() {
 
 
 
-
-
-
   tft.pushImage(10, 200, icon_fire_width, icon_fire_height, icon_fire);
   tft.pushImage(50, 200, icon_sun_width,  icon_sun_height,  icon_sun);
   tft.pushImage(90, 200, icon_grid_width, icon_grid_height, icon_grid);
   tft.pushImage(120, 200,icon_plug_width, icon_plug_height, icon_plug);
+  tft.pushImage(160, 180,icon_heater_width, icon_heater_height, icon_heater);
 
 
   // Start the SPI for the touch screen and init the TS library
@@ -436,8 +485,6 @@ void setup() {
 
   //while(1) 
   {
-
-  
     for (int i=0; i< 2000; i+=50){
       Dial(i);
       AddNewPower(i);
@@ -447,9 +494,12 @@ void setup() {
       AddNewHotWater(t, t/2,t/3,t/4);
       Energy(i/200.0);
       AddNewImmersion(i%1000);
+      Ashp_Draw(i,  i/100.0);
 
       delay(100);
     }
+    
+    
     for(int i=0;i<10;i++){
       delay(300);
       ledcAnalogWrite(LEDC_CHANNEL_0, 0); // Off
@@ -466,7 +516,7 @@ void setup() {
       AddNewHotWater(t,t*0.8, t*0.7, t*0.4);
 
       Energy(i/200.0);
-
+      Ashp_Draw(i,  i/100.0);
 
       delay(100);
     }
@@ -571,7 +621,19 @@ void callback(char* topic, byte* message, unsigned int length) {
     energy = Message.toFloat();
     Serial.print("energy=");
     Serial.println(energy);
+  
+  }else if(Topic=="roost/ashp_power"){
+    ashp_power = Message.toFloat();
+    Serial.print("ashp_power=");
+    Serial.println(ashp_power);
+  
+  }else if(Topic=="roost/ashp_energy_today"){
+    ashp_energy_today = Message.toFloat();
+    Serial.print("ashp_energy_today=");
+    Serial.println(ashp_energy_today);
   }
+
+
 
   //only update once on the final mqtt message topic of the set
   if(Topic=="roost/hot_water_tank_bottom"){
@@ -587,6 +649,7 @@ void callback(char* topic, byte* message, unsigned int length) {
       Dial(power);
       HotWater(hot_water_tank_top,hot_water_tank_upper,hot_water_tank_lower,   hot_water_tank_bottom,hotwater_minutes );
       Energy(energy);
+      Ashp_Draw(ashp_power ,  ashp_energy_today);
     }else{
       ledcAnalogWrite(LEDC_CHANNEL_0, 0);
     }
@@ -638,7 +701,8 @@ void reconnect() {
       client.subscribe("roost/immersion_energy_today");
       client.subscribe("roost/immersion_on");
       client.subscribe("roost/immersion_power");
-      client.subscribe("roost/energy");
+      client.subscribe("roost/ashp_power");
+      client.subscribe("roost/ashp_energy_today");
       //timeClienty");
       
       Serial.println( "subscribed to roost/...");
@@ -683,6 +747,7 @@ void loop() {
         
         Dial(power);
         HotWater(hot_water_tank_top,hot_water_tank_upper,hot_water_tank_lower,  hot_water_tank_bottom,hotwater_minutes );
+        Ashp_Draw(ashp_power ,  ashp_energy_today);
         Energy(energy);
       }else{
           HotGraph();
