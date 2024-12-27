@@ -31,63 +31,66 @@ data = {
     "client_secret" : CLIENT_SECRET,
 }
 
-while(True):
-
+def GetTado():
+    mqtt_data=[]
     response = requests.post('https://auth.tado.com/oauth/token', data=data)
-
-    if response.status_code==200:
-        ACCESS_TOKEN=response.json()["access_token"]
-
-        headers = {
-            'Authorization': 'Bearer ' + ACCESS_TOKEN,
-        }
-        response = requests.get('https://my.tado.com/api/v1/me', headers=headers)
-        
+    try:
         if response.status_code==200:
-            HOME_ID=response.json()["homeId"]
-            print(HOME_ID)
-
+            ACCESS_TOKEN=response.json()["access_token"]
 
             headers = {
                 'Authorization': 'Bearer ' + ACCESS_TOKEN,
             }
-            response = requests.get('https://my.tado.com/api/v2/homes/' + str(HOME_ID) +'/zones', headers=headers)
-
-            sensors={}
+            response = requests.get('https://my.tado.com/api/v1/me', headers=headers)
+            
             if response.status_code==200:
-                for d in response.json():
-                    #print (d["id"], d["name"])
-                    sensors[d["id"]]= d["name"]
+                HOME_ID=response.json()["homeId"]
+                print(HOME_ID)
 
-                for id, name in sensors.items():
-                    response = requests.get('https://my.tado.com/api/v2/homes/' + str(HOME_ID) +'/zones/' + str(id)+  '/state', headers=headers)
-                    
-                    if response.status_code==200:
-                        #HOME_ID=response.json()["homeId"]
-                        current_temp=response.json()["sensorDataPoints"]["insideTemperature"]["celsius"]
-                        request_temp=response.json()["setting"]["temperature"]["celsius"]
-                        valve       =response.json()["activityDataPoints"]["heatingPower"]["percentage"]
-                        humidity    =response.json()["sensorDataPoints"]["humidity"]["percentage"]
-                        print("%5s   " %id, 
-                            "%13s  " %name, 
-                            "%5s   " %current_temp, 
-                            "%5s   " %request_temp, 
-                            "%5s   " %valve, 
-                            "%5s   " %humidity )
-                        # pack data ready for MQTT
-                        mqtt_data=[current_temp,request_temp,valve,humidity]
-                        #mqtt client.publish("tado/%s" %name, json.dumps(mqtt_data) )
 
-                    else:
-                        print("FAIL (D)" , response.status_code)
-                
+                headers = {
+                    'Authorization': 'Bearer ' + ACCESS_TOKEN,
+                }
+                response = requests.get('https://my.tado.com/api/v2/homes/' + str(HOME_ID) +'/zones', headers=headers)
+
+                sensors={}
+                if response.status_code==200:
+                    for d in response.json():
+                        #print (d["id"], d["name"])
+                        sensors[d["id"]]= d["name"]
+
+                    for id, name in sensors.items():
+                        response = requests.get('https://my.tado.com/api/v2/homes/' + str(HOME_ID) +'/zones/' + str(id)+  '/state', headers=headers)
+                        
+                        if response.status_code==200:
+                            #HOME_ID=response.json()["homeId"]
+                            current_temp=response.json()["sensorDataPoints"]["insideTemperature"]["celsius"]
+                            request_temp=response.json()["setting"]["temperature"]["celsius"]
+                            valve       =response.json()["activityDataPoints"]["heatingPower"]["percentage"]
+                            humidity    =response.json()["sensorDataPoints"]["humidity"]["percentage"]
+                            print("%5s   " %id, 
+                                "%13s  " %name, 
+                                "%5s   " %current_temp, 
+                                "%5s   " %request_temp, 
+                                "%5s   " %valve, 
+                                "%5s   " %humidity )
+                            # pack data ready for MQTT
+                            #mqtt_data=[current_temp,request_temp,valve,humidity]
+                            mqtt_data.append([name, current_temp,request_temp,valve,humidity])
+                            #mqtt client.publish("tado/%s" %name, json.dumps(mqtt_data) )
+                        else:
+                            raise Exception("FAIL (D) %d" %response.status_code )
+                else:
+                    raise Exception("FAIL (C) %d" %response.status_code )
             else:
-                print("FAIL (C)" , response.status_code)
-
+                raise Exception("FAIL (B) %d" %response.status_code )
         else:
-            print("FAIL (B)" , response.status_code)
+            raise Exception("FAIL (A) %d" %response.status_code )
+    except:
+        None    
+    return mqtt_data
 
-    else:
-        print("FAIL (A)" , response.status_code)
-    
+while(True):
+    mqtt=GetTado()
+    print(mqtt)
     time.sleep(60*1)
