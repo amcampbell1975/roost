@@ -23,8 +23,6 @@ CLIENT_SECRET="wZaRN7rpjn3FoNyF5IFuxg9uMzYJcvOoQ8QWiIqS3hfk6gLhVlG57j5YNoZL2Rtc"
 data = {
     'client_id' : 'tado-web-app',
     'grant_type': 'password',
-    'scope'     : 'home.user',
-    'username'  : 'abc',
     'scope'     : "home.user" ,
     'username'  : USERNAME ,
     'password'  : PASSWORD,
