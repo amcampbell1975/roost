@@ -4,6 +4,8 @@
 import requests
 from tado_secret import * # USERNAME & PASSWORD
 
+#https://blog.scphillips.com/posts/2017/01/the-tado-api-v2/
+#https://shkspr.mobi/blog/2019/02/tado-api-guide-updated-for-2019/
 
 #mqtt import paho.mqtt.client as mqtt
 import time
