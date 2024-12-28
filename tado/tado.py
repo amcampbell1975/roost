@@ -93,5 +93,11 @@ def GetTado():
 if __name__ == '__main__':
     while(True):
         mqtt=GetTado()
-        print(mqtt)
+        for i in mqtt:
+            print("tado/current_temp/%s/%s" %(i[0],i[1]) )
+            print("tado/request_temp/%s/%s" %(i[0],i[2]) )
+            print("tado/valve/%s/%s"        %(i[0],i[3]) )
+            print("tado/humidity/%s/%s"     %(i[0],i[4]) )
+
+        #print(mqtt)
         time.sleep(60*1)
