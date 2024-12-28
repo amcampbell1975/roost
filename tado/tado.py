@@ -90,7 +90,8 @@ def GetTado():
         None    
     return mqtt_data
 
-while(True):
-    mqtt=GetTado()
-    print(mqtt)
-    time.sleep(60*1)
+if __name__ == '__main__':
+    while(True):
+        mqtt=GetTado()
+        print(mqtt)
+        time.sleep(60*1)
