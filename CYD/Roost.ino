@@ -69,7 +69,7 @@ struct {
   float ashp_energy_today=0;
   float tado_current_temperature[8]={0};
   float tado_requested_temperature[8]={0};
-  float tado_heating_power[8]={0};
+  float tado_valve[8]={0};
   float tado_humidity[8]={0};
 } latest_data;
 
@@ -121,6 +121,8 @@ void TadoDraw(){
       int y= i<=4 ? 0 : 30;
 
       sprite_tado.fillRect(x, y,28,28,colour_bar[colour_bar_index] );
+      const int width=map(latest_data.tado_valve[i],0,100,0,28);
+      sprite_tado.fillRect(x+1, y+1,width,5,TFT_RED );
 
       // sprite_tado.drawString(String(t),i*15,0, 2);
    }
@@ -640,28 +642,37 @@ void callback(char* topic, byte* message, unsigned int length) {
       Serial.println(latest_data.ashp_energy_today);
    }else if(Topic=="tado/current_temp/VA Bedroom"){
       latest_data.tado_current_temperature[0] = Message.toFloat();
-      //Serial.print(Message.c_str());
    }else if(Topic=="tado/current_temp/Maddie"){
       latest_data.tado_current_temperature[1] = Message.toFloat();
-      //Serial.print(Message.c_str());
    }else if(Topic=="tado/current_temp/Seb"){
       latest_data.tado_current_temperature[2] = Message.toFloat();
-      //Serial.print(Message.c_str());
    }else if(Topic=="tado/current_temp/Study"){
       latest_data.tado_current_temperature[3] = Message.toFloat();
    }else if(Topic=="tado/current_temp/Bathroom"){
       latest_data.tado_current_temperature[4] = Message.toFloat();
-      // Serial.print(Message.c_str());
-      //Serial.print(Message.c_str());
    }else if(Topic=="tado/current_temp/Dining Room"){
       latest_data.tado_current_temperature[5] = Message.toFloat();
-      //Serial.print(Message.c_str());
    }else if(Topic=="tado/current_temp/Lounge"){
       latest_data.tado_current_temperature[6] = Message.toFloat();
-      //Serial.print(Message.c_str());
    }else if(Topic=="tado/current_temp/Hallway"){
       latest_data.tado_current_temperature[7] = Message.toFloat();
-      //Serial.print(Message.c_str());
+   
+   }else if(Topic=="tado/valve/VA Bedroom"){
+      latest_data.tado_valve[0] = Message.toFloat();
+   }else if(Topic=="tado/valve/Maddie"){
+      latest_data.tado_valve[1] = Message.toFloat();
+   }else if(Topic=="tado/valve/Seb"){
+      latest_data.tado_valve[2] = Message.toFloat();
+   }else if(Topic=="tado/valve/Study"){
+      latest_data.tado_valve[3] = Message.toFloat();
+   }else if(Topic=="tado/valve/Bathroom"){
+      latest_data.tado_valve[4] = Message.toFloat();
+   }else if(Topic=="tado/valve/Dining Room"){
+      latest_data.tado_valve[5] = Message.toFloat();
+   }else if(Topic=="tado/valve/Lounge"){
+      latest_data.tado_valve[6] = Message.toFloat();
+   }else if(Topic=="tado/valve/Hallway"){
+      latest_data.tado_valve[7] = Message.toFloat();
    }
 
 
@@ -729,7 +740,14 @@ void reconnect() {
          client.subscribe("tado/current_temp/Hallway");
          client.subscribe("tado/current_temp/Study");
          client.subscribe("tado/current_temp/Bathroom");
-         
+         client.subscribe("tado/valve/VA Bedroom");
+         client.subscribe("tado/valve/Maddie");
+         client.subscribe("tado/valve/Seb");
+         client.subscribe("tado/valve/Dining Room");
+         client.subscribe("tado/valve/Lounge");
+         client.subscribe("tado/valve/Hallway");
+         client.subscribe("tado/valve/Study");
+         client.subscribe("tado/valve/Bathroom");
          //timeClienty");
          Serial.println( "subscribed to roost/...");
       } else {
