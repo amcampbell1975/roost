@@ -776,6 +776,7 @@ void loop() {
          }else{
             HotGraph();
          }   
+         TadoDraw();
       } 
    }  
    if (!client.connected()) {
