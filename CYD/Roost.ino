@@ -110,23 +110,23 @@ void TadoDraw(){
    const uint16_t colour_bar[TADO_COLORS]={TFT_DARKCYAN ,TFT_CYAN, TFT_MAGENTA , TFT_ORANGE,TFT_RED,TFT_WHITE};
    for (int i=0;i<8;i++){
       Serial.println(latest_data.tado_current_temperature[i]);
-      float t=latest_data.tado_current_temperature[i];
+      const float t=latest_data.tado_current_temperature[i];
 
       const float MAX_TEMP=22;
       const float MIN_TEMP=16;
       int colour_bar_index=map(t,MIN_TEMP,MAX_TEMP,0,TADO_COLORS );
       colour_bar_index=constrain(colour_bar_index,0,TADO_COLORS-1);
 
-      int x= i<=4 ? 20*i : ((i-5)*20) +10;
-      int y= i<=4 ? 0 : 20;
+      int x= i<=4 ? 30*i : ((i-5)*30) +15;
+      int y= i<=4 ? 0 : 30;
 
-      sprite_tado.fillRect(x, y,18,18,colour_bar[colour_bar_index] );
+      sprite_tado.fillRect(x, y,28,28,colour_bar[colour_bar_index] );
 
       // sprite_tado.drawString(String(t),i*15,0, 2);
    }
 
 
-   sprite_tado.pushSprite(0, 200, TFT_TRANSPARENT);
+   sprite_tado.pushSprite(0, 180, TFT_TRANSPARENT);
   // delay(2000);
 }
 
@@ -462,7 +462,7 @@ Serial.begin(115200);
    sprite_energy.createSprite(160,30);
 
    sprite_tado.setColorDepth(8);
-   sprite_tado.createSprite(100,40);
+   sprite_tado.createSprite(150,60);
 
 
    tft.fillScreen(TFT_BLACK);
