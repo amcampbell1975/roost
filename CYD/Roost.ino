@@ -91,6 +91,8 @@ TFT_eSprite sprite_power = TFT_eSprite(&tft);
 TFT_eSprite sprite_ashp = TFT_eSprite(&tft); 
 TFT_eSprite sprite_tank  = TFT_eSprite(&tft); 
 TFT_eSprite sprite_energy= TFT_eSprite(&tft); 
+TFT_eSprite sprite_tado  = TFT_eSprite(&tft); 
+
 
 int limit(int in, int min, int max){
    if(in < min)
@@ -99,6 +101,35 @@ int limit(int in, int min, int max){
       return max;
    return in; 
 }
+
+void TadoDraw(){
+   // sprite_tado.fillScreen(TFT_DARKGREY);
+   sprite_tado.fillScreen(TFT_BLACK);
+   Serial.println("Tado Draw");
+   #define TADO_COLORS 6
+   const uint16_t colour_bar[TADO_COLORS]={TFT_DARKCYAN ,TFT_CYAN, TFT_MAGENTA , TFT_ORANGE,TFT_RED,TFT_WHITE};
+   for (int i=0;i<8;i++){
+      Serial.println(latest_data.tado_current_temperature[i]);
+      float t=latest_data.tado_current_temperature[i];
+
+      const float MAX_TEMP=22;
+      const float MIN_TEMP=16;
+      int colour_bar_index=map(t,MIN_TEMP,MAX_TEMP,0,TADO_COLORS );
+      colour_bar_index=constrain(colour_bar_index,0,TADO_COLORS-1);
+
+      int x= i<=4 ? 20*i : ((i-5)*20) +10;
+      int y= i<=4 ? 0 : 20;
+
+      sprite_tado.fillRect(x, y,18,18,colour_bar[colour_bar_index] );
+
+      // sprite_tado.drawString(String(t),i*15,0, 2);
+   }
+
+
+   sprite_tado.pushSprite(0, 200, TFT_TRANSPARENT);
+  // delay(2000);
+}
+
 
 void Ashp_Draw(float ashp_power, float ashp_energy_today){
 
@@ -430,6 +461,9 @@ Serial.begin(115200);
    sprite_energy.setColorDepth(8);
    sprite_energy.createSprite(160,30);
 
+   sprite_tado.setColorDepth(8);
+   sprite_tado.createSprite(100,40);
+
 
    tft.fillScreen(TFT_BLACK);
 
@@ -462,6 +496,7 @@ Serial.begin(115200);
    }
    
    delay(2000);
+
 
    //while(1) 
    {
@@ -612,21 +647,21 @@ void callback(char* topic, byte* message, unsigned int length) {
    }else if(Topic=="tado/current_temp/Seb"){
       latest_data.tado_current_temperature[2] = Message.toFloat();
       //Serial.print(Message.c_str());
-   }else if(Topic=="tado/current_temp/Dining Room"){
+   }else if(Topic=="tado/current_temp/Study"){
       latest_data.tado_current_temperature[3] = Message.toFloat();
-      //Serial.print(Message.c_str());
-   }else if(Topic=="tado/current_temp/Lounge"){
+   }else if(Topic=="tado/current_temp/Bathroom"){
       latest_data.tado_current_temperature[4] = Message.toFloat();
+      // Serial.print(Message.c_str());
       //Serial.print(Message.c_str());
-   }else if(Topic=="tado/current_temp/Hallway"){
+   }else if(Topic=="tado/current_temp/Dining Room"){
       latest_data.tado_current_temperature[5] = Message.toFloat();
       //Serial.print(Message.c_str());
-   }else if(Topic=="tado/current_temp/Study"){
+   }else if(Topic=="tado/current_temp/Lounge"){
       latest_data.tado_current_temperature[6] = Message.toFloat();
       //Serial.print(Message.c_str());
-   }else if(Topic=="tado/current_temp/Bathroom"){
+   }else if(Topic=="tado/current_temp/Hallway"){
       latest_data.tado_current_temperature[7] = Message.toFloat();
-      // Serial.print(Message.c_str());
+      //Serial.print(Message.c_str());
    }
 
 
@@ -654,10 +689,7 @@ void callback(char* topic, byte* message, unsigned int length) {
       }else{
          ledcAnalogWrite(LEDC_CHANNEL_0, 0);
       }
-      Serial.println("Tado current Temperature =");
-      for (int i=0;i<8;i++){
-         Serial.println(latest_data.tado_current_temperature[i]);
-      }
+      TadoDraw();
    }
 }
 
