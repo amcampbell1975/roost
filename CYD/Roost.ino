@@ -67,6 +67,10 @@ struct {
   float immersion_power=0;
   float ashp_power=0;
   float ashp_energy_today=0;
+  float tado_current_temperature[8]={0};
+  float tado_requested_temperature[8]={0};
+  float tado_heating_power[8]={0};
+  float tado_humidity[8]={0};
 } latest_data;
 
 struct{
@@ -599,7 +603,34 @@ void callback(char* topic, byte* message, unsigned int length) {
       latest_data.ashp_energy_today = Message.toFloat();
       Serial.print("ashp_energy_today=");
       Serial.println(latest_data.ashp_energy_today);
+   }else if(Topic=="tado/current_temp/VA Bedroom"){
+      latest_data.tado_current_temperature[0] = Message.toFloat();
+      //Serial.print(Message.c_str());
+   }else if(Topic=="tado/current_temp/Maddie"){
+      latest_data.tado_current_temperature[1] = Message.toFloat();
+      //Serial.print(Message.c_str());
+   }else if(Topic=="tado/current_temp/Seb"){
+      latest_data.tado_current_temperature[2] = Message.toFloat();
+      //Serial.print(Message.c_str());
+   }else if(Topic=="tado/current_temp/Dining Room"){
+      latest_data.tado_current_temperature[3] = Message.toFloat();
+      //Serial.print(Message.c_str());
+   }else if(Topic=="tado/current_temp/Lounge"){
+      latest_data.tado_current_temperature[4] = Message.toFloat();
+      //Serial.print(Message.c_str());
+   }else if(Topic=="tado/current_temp/Hallway"){
+      latest_data.tado_current_temperature[5] = Message.toFloat();
+      //Serial.print(Message.c_str());
+   }else if(Topic=="tado/current_temp/Study"){
+      latest_data.tado_current_temperature[6] = Message.toFloat();
+      //Serial.print(Message.c_str());
+   }else if(Topic=="tado/current_temp/Bathroom"){
+      latest_data.tado_current_temperature[7] = Message.toFloat();
+      // Serial.print(Message.c_str());
    }
+
+
+
 
   //only update once on the final mqtt message topic of the set
    if(Topic=="roost/hot_water_tank_bottom"){
@@ -622,6 +653,10 @@ void callback(char* topic, byte* message, unsigned int length) {
       Ashp_Draw(latest_data.ashp_power ,  latest_data.ashp_energy_today);
       }else{
          ledcAnalogWrite(LEDC_CHANNEL_0, 0);
+      }
+      Serial.println("Tado current Temperature =");
+      for (int i=0;i<8;i++){
+         Serial.println(latest_data.tado_current_temperature[i]);
       }
    }
 }
@@ -654,6 +689,15 @@ void reconnect() {
          client.subscribe("roost/immersion_power");
          client.subscribe("roost/ashp_power");
          client.subscribe("roost/ashp_energy_today");
+         client.subscribe("tado/current_temp/VA Bedroom");
+         client.subscribe("tado/current_temp/Maddie");
+         client.subscribe("tado/current_temp/Seb");
+         client.subscribe("tado/current_temp/Dining Room");
+         client.subscribe("tado/current_temp/Lounge");
+         client.subscribe("tado/current_temp/Hallway");
+         client.subscribe("tado/current_temp/Study");
+         client.subscribe("tado/current_temp/Bathroom");
+         
          //timeClienty");
          Serial.println( "subscribed to roost/...");
       } else {
