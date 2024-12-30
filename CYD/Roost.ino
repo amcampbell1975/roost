@@ -117,18 +117,21 @@ void TadoDraw(){
       int colour_bar_index=map(t,MIN_TEMP,MAX_TEMP,0,TADO_COLORS );
       colour_bar_index=constrain(colour_bar_index,0,TADO_COLORS-1);
 
-      int x= i<=4 ? 30*i : ((i-5)*30) +15;
-      int y= i<=4 ? 0 : 30;
+      int x= i<=4 ? (30*i)+2 : ((i-5)*30) +15;
+      int y= i<=4 ? (0)   +2 : (      30) +2;
+
+      sprite_tado.drawRect(0, 0,(30*5)+2, 62,TFT_WHITE);
 
       sprite_tado.fillRect(x, y,28,28,colour_bar[colour_bar_index] );
       const int width=map(latest_data.tado_valve[i],0,100,0,28);
+      sprite_tado.fillRect(x+1, y+1, 26,5,TFT_BLACK );
       sprite_tado.fillRect(x+1, y+1,width,5,TFT_RED );
 
       // sprite_tado.drawString(String(t),i*15,0, 2);
    }
 
 
-   sprite_tado.pushSprite(0, 180, TFT_TRANSPARENT);
+   sprite_tado.pushSprite(3, 170, TFT_TRANSPARENT);
   // delay(2000);
 }
 
@@ -464,7 +467,7 @@ Serial.begin(115200);
    sprite_energy.createSprite(160,30);
 
    sprite_tado.setColorDepth(8);
-   sprite_tado.createSprite(150,60);
+   sprite_tado.createSprite(160,70);
 
 
    tft.fillScreen(TFT_BLACK);
@@ -695,12 +698,12 @@ void callback(char* topic, byte* message, unsigned int length) {
                latest_data.hot_water_tank_lower,   
                latest_data.hot_water_tank_bottom,
                latest_data.hotwater_minutes );
-      Energy(latest_data.energy);
+      //Energy(latest_data.energy);
+      TadoDraw();
       Ashp_Draw(latest_data.ashp_power ,  latest_data.ashp_energy_today);
       }else{
          ledcAnalogWrite(LEDC_CHANNEL_0, 0);
       }
-      TadoDraw();
    }
 }
 
@@ -791,10 +794,10 @@ void loop() {
                      latest_data.hotwater_minutes );
             Ashp_Draw(latest_data.ashp_power ,  latest_data.ashp_energy_today);
             Energy(latest_data.energy);
+            TadoDraw();
          }else{
             HotGraph();
          }   
-         TadoDraw();
       } 
    }  
    if (!client.connected()) {
