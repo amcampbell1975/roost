@@ -123,7 +123,7 @@ void TadoDraw(){
 
       sprite_tado.fillRect(x, y,28,28,colour_bar[colour_bar_index] );
       if (i!=8){ // no valve on the central kitchen 
-         const int width=map(latest_data.tado_valve[i],0,100,0,28);
+         const int width=map(latest_data.tado_valve[i],0,100,0,27);
          sprite_tado.fillRect(x+1, y+1, 26,5,TFT_BLACK );
          sprite_tado.fillRect(x+1, y+1,width,5,TFT_RED );
          }
