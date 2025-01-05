@@ -67,10 +67,10 @@ struct {
   float immersion_power=0;
   float ashp_power=0;
   float ashp_energy_today=0;
-  float tado_current_temperature[8]={0};
-  float tado_requested_temperature[8]={0};
-  float tado_valve[8]={0};
-  float tado_humidity[8]={0};
+  float tado_current_temperature[9]={0};
+  float tado_requested_temperature[9]={0};
+  float tado_valve[9]={0};
+  float tado_humidity[9]={0};
 } latest_data;
 
 struct{
@@ -106,9 +106,10 @@ void TadoDraw(){
    // sprite_tado.fillScreen(TFT_DARKGREY);
    sprite_tado.fillScreen(TFT_BLACK);
    Serial.println("Tado Draw");
+   sprite_tado.drawRect(0, 0,(30*5)+2, 62,TFT_WHITE);
    #define TADO_COLORS 6
    const uint16_t colour_bar[TADO_COLORS]={TFT_DARKCYAN ,TFT_CYAN, TFT_MAGENTA , TFT_ORANGE,TFT_RED,TFT_WHITE};
-   for (int i=0;i<8;i++){
+   for (int i=0;i<9;i++){
       Serial.println(latest_data.tado_current_temperature[i]);
       const float t=latest_data.tado_current_temperature[i];
 
@@ -120,12 +121,12 @@ void TadoDraw(){
       int x= i<=4 ? (30*i)+2 : ((i-5)*30) +15;
       int y= i<=4 ? (0)   +2 : (      30) +2;
 
-      sprite_tado.drawRect(0, 0,(30*5)+2, 62,TFT_WHITE);
-
       sprite_tado.fillRect(x, y,28,28,colour_bar[colour_bar_index] );
-      const int width=map(latest_data.tado_valve[i],0,100,0,28);
-      sprite_tado.fillRect(x+1, y+1, 26,5,TFT_BLACK );
-      sprite_tado.fillRect(x+1, y+1,width,5,TFT_RED );
+      if (i!=8){ // no valve on the central kitchen 
+         const int width=map(latest_data.tado_valve[i],0,100,0,28);
+         sprite_tado.fillRect(x+1, y+1, 26,5,TFT_BLACK );
+         sprite_tado.fillRect(x+1, y+1,width,5,TFT_RED );
+         }
 
       if ( colour_bar_index==1) // Check for cyan background. 
          sprite_tado.setTextColor(TFT_BLACK, colour_bar[colour_bar_index]);
@@ -133,7 +134,7 @@ void TadoDraw(){
          sprite_tado.setTextColor(TFT_WHITE, colour_bar[colour_bar_index]);
       
 
-      const String RoomName[8]={"VA","M","S","St","Ba","D","L","H"};
+      const String RoomName[9]={"VA","M","S","St","Ba","D","L","H","K"};
       sprite_tado.drawString(RoomName[i],x+2,y+8,2);
 
 
@@ -669,7 +670,8 @@ void callback(char* topic, byte* message, unsigned int length) {
       latest_data.tado_current_temperature[6] = Message.toFloat();
    }else if(Topic=="tado/current_temp/Hallway"){
       latest_data.tado_current_temperature[7] = Message.toFloat();
-   
+   }else if(Topic=="tado/current_temp/Central"){
+      latest_data.tado_current_temperature[8] = Message.toFloat();
    }else if(Topic=="tado/valve/VA Bedroom"){
       latest_data.tado_valve[0] = Message.toFloat();
    }else if(Topic=="tado/valve/Maddie"){
@@ -686,9 +688,9 @@ void callback(char* topic, byte* message, unsigned int length) {
       latest_data.tado_valve[6] = Message.toFloat();
    }else if(Topic=="tado/valve/Hallway"){
       latest_data.tado_valve[7] = Message.toFloat();
+   }else if(Topic=="tado/valve/Central"){
+      latest_data.tado_valve[8] = Message.toFloat();
    }
-
-
 
 
   //only update once on the final mqtt message topic of the set
@@ -753,6 +755,7 @@ void reconnect() {
          client.subscribe("tado/current_temp/Hallway");
          client.subscribe("tado/current_temp/Study");
          client.subscribe("tado/current_temp/Bathroom");
+         client.subscribe("tado/current_temp/Central");
          client.subscribe("tado/valve/VA Bedroom");
          client.subscribe("tado/valve/Maddie");
          client.subscribe("tado/valve/Seb");
@@ -761,6 +764,7 @@ void reconnect() {
          client.subscribe("tado/valve/Hallway");
          client.subscribe("tado/valve/Study");
          client.subscribe("tado/valve/Bathroom");
+         client.subscribe("tado/valve/Central");
          //timeClienty");
          Serial.println( "subscribed to roost/...");
       } else {
