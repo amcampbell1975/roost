@@ -127,6 +127,16 @@ void TadoDraw(){
       sprite_tado.fillRect(x+1, y+1, 26,5,TFT_BLACK );
       sprite_tado.fillRect(x+1, y+1,width,5,TFT_RED );
 
+      if ( colour_bar_index==1) // Check for cyan background. 
+         sprite_tado.setTextColor(TFT_BLACK, colour_bar[colour_bar_index]);
+      else
+         sprite_tado.setTextColor(TFT_WHITE, colour_bar[colour_bar_index]);
+      
+
+      const String RoomName[8]={"VA","M","S","St","Ba","D","L","H"};
+      sprite_tado.drawString(RoomName[i],x+2,y+8,2);
+
+
       // sprite_tado.drawString(String(t),i*15,0, 2);
    }
 
