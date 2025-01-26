@@ -29,6 +29,11 @@ immersion_on = 0
 immersion_time = 0
 immersion_energy_today = 0
 immersion_power = 0
+<<<<<<< HEAD
+ashp_power = 0
+ashp_energy_today=0
+=======
+>>>>>>> 1b89ced1ef7bf1157fa215fdde31d4ec8df850c1
 
 excess_power=0
 
@@ -83,9 +88,16 @@ def DailyLog():
     if samples==120:
         print("MIDNIGHT SAVING TOTALS")
         f = open("log.csv", "a")
+<<<<<<< HEAD
+        f.write("%s, %d , %.4f , %.4f , %.4f , %.1f , %d , %d, %d , %.3f\n" 
+                 %(time.asctime(), time.time(), energy ,energy_import ,
+                   energy_export,temperature_top,immersion_power,immersion_energy_today,
+                   ashp_power, ashp_energy) )
+=======
         f.write("%s, %d , %.4f , %.4f , %.4f , %.1f , %d , %d\n" 
                  %(time.asctime(), time.time(), energy ,energy_import ,
                    energy_export,temperature_top,immersion_on,immersion_time) )
+>>>>>>> 1b89ced1ef7bf1157fa215fdde31d4ec8df850c1
         f.close()
         samples=0
     
@@ -112,6 +124,10 @@ def on_message(client, userdata, message):
     global plug2_on, plug2_power,plug2_energy_today
     global temperature_top ,temperature_bottom
     global temperature_upper ,temperature_lower
+<<<<<<< HEAD
+    global ashp_power, ashp_energy_today
+=======
+>>>>>>> 1b89ced1ef7bf1157fa215fdde31d4ec8df850c1
    
     if message.topic=="tele/tasmota_FE4918/SENSOR":
         data=json.loads(str(message.payload.decode("utf-8")))
@@ -148,6 +164,11 @@ def on_message(client, userdata, message):
         client.publish("roost/plug1_power",             str(plug1_power))
         client.publish("roost/plug2_on",                str(plug2_on))
         client.publish("roost/plug2_power",             str(plug2_power))
+<<<<<<< HEAD
+        client.publish("roost/ashp_power",              str(ashp_power))
+        client.publish("roost/ashp_energy_today",       str(ashp_energy_today))
+=======
+>>>>>>> 1b89ced1ef7bf1157fa215fdde31d4ec8df850c1
         DailyLog()
 
     if message.topic=="tele/tasmota_0FC0E1/SENSOR":  # Water Tank temperature.
@@ -169,6 +190,10 @@ def on_message(client, userdata, message):
         print("plug1_power       =", plug1_power) 
         print("plug1_energy_today=", plug1_energy_today) 
 
+    if message.topic=="tele/heatpump/SENSOR":
+        data=json.loads(str(message.payload.decode("utf-8")))
+        ashp_power=data["ENERGY"]["Power"]
+        ashp_energy_today=data["ENERGY"]["Today"]
 
     if message.topic=="tele/Plug2/SENSOR":
         data=json.loads(str(message.payload.decode("utf-8")))
@@ -194,7 +219,12 @@ topics=[# "#",
         "tele/Plug2/SENSOR",           # Car/Dehumidifier
         "tele/tasmota_FE4918/SENSOR",  # House Mains power.
         "tele/tasmota_0FC0E1/SENSOR",  # Water Tank temperature.
+<<<<<<< HEAD
+        "tele/tasmota_0FC0E1/SENSOR",  # Water Tank temperature.
+        "tele/heatpump/SENSOR"      ,  # Air Source Heat pump. 
+=======
 
+>>>>>>> 1b89ced1ef7bf1157fa215fdde31d4ec8df850c1
         #"House/Power" # , "cmnd/sonoff/POWER"]
         ]
 for topic in topics:
