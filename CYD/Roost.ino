@@ -670,7 +670,7 @@ void callback(char* topic, byte* message, unsigned int length) {
       latest_data.tado_current_temperature[6] = Message.toFloat();
    }else if(Topic=="tado/current_temp/Hallway"){
       latest_data.tado_current_temperature[7] = Message.toFloat();
-   }else if(Topic=="tado/current_temp/Central"){
+   }else if(Topic=="tado/current_temp/Kitchen"){
       latest_data.tado_current_temperature[8] = Message.toFloat();
    }else if(Topic=="tado/valve/VA Bedroom"){
       latest_data.tado_valve[0] = Message.toFloat();
@@ -688,7 +688,7 @@ void callback(char* topic, byte* message, unsigned int length) {
       latest_data.tado_valve[6] = Message.toFloat();
    }else if(Topic=="tado/valve/Hallway"){
       latest_data.tado_valve[7] = Message.toFloat();
-   }else if(Topic=="tado/valve/Central"){
+   }else if(Topic=="tado/valve/Kitchen"){
       latest_data.tado_valve[8] = Message.toFloat();
    }
 
@@ -755,7 +755,7 @@ void reconnect() {
          client.subscribe("tado/current_temp/Hallway");
          client.subscribe("tado/current_temp/Study");
          client.subscribe("tado/current_temp/Bathroom");
-         client.subscribe("tado/current_temp/Central");
+         client.subscribe("tado/current_temp/Kitchen");
          client.subscribe("tado/valve/VA Bedroom");
          client.subscribe("tado/valve/Maddie");
          client.subscribe("tado/valve/Seb");
@@ -764,7 +764,7 @@ void reconnect() {
          client.subscribe("tado/valve/Hallway");
          client.subscribe("tado/valve/Study");
          client.subscribe("tado/valve/Bathroom");
-         client.subscribe("tado/valve/Central");
+         client.subscribe("tado/valve/Kitchen");
          //timeClienty");
          Serial.println( "subscribed to roost/...");
       } else {
