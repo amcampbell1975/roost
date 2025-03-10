@@ -45,13 +45,13 @@ def GetTado():
             
             if response.status_code==200:
                 HOME_ID=response.json()["homeId"]
-                print(HOME_ID)
+                print("HOME_ID=",  HOME_ID)
 
 
                 headers = {
                     'Authorization': 'Bearer ' + ACCESS_TOKEN,
                 }
-                response = requests.get('https://my.tado.com/api/v2/homes/' + str(HOME_ID) +'/zones', headers=headers)
+                response = requests.get('https://my.tado.com/api/v2/homes/' + str(HOME_ID) +'/zones', headers=headers, timeout=5)
 
                 sensors={}
                 if response.status_code==200:
@@ -79,12 +79,17 @@ def GetTado():
                             mqtt_data.append([name, current_temp,request_temp,valve,humidity])
                             #mqtt client.publish("tado/%s" %name, json.dumps(mqtt_data) )
                         else:
+                            print("FAIL (D) %d" %response.status_code)
                             raise Exception("FAIL (D) %d" %response.status_code )
                 else:
+                    print("FAIL (C) %d" %response.status_code)
                     raise Exception("FAIL (C) %d" %response.status_code )
             else:
+                print("FAIL (B) %d" %response.status_code)
                 raise Exception("FAIL (B) %d" %response.status_code )
         else:
+            print("FAIL (A) %d" %response.status_code)
+            print("response.text='%s'" %response.text)
             raise Exception("FAIL (A) %d" %response.status_code )
     except:
         None    
@@ -100,4 +105,4 @@ if __name__ == '__main__':
             print("tado/humidity/%s/%s"     %(i[0],i[4]) )
 
         #print(mqtt)
-        time.sleep(60*1)
+        time.sleep(60*5)
