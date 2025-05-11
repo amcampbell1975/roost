@@ -1,9 +1,15 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <TFT_eSPI.h>
+#define GFXFF 1
+#define FF18 &FreeSans12pt7b
 
 #include <SPI.h>
 #include <XPT2046_Touchscreen.h>  //https://github.com/PaulStoffregen/XPT2046_Touchscreen (Search for "XPT2046")
+#include <sunset.h>
+
+SunSet sun;
+
 
 #include "icons.h" // Roost Icons.
 
@@ -93,6 +99,53 @@ TFT_eSprite sprite_tank  = TFT_eSprite(&tft);
 TFT_eSprite sprite_energy= TFT_eSprite(&tft); 
 TFT_eSprite sprite_tado  = TFT_eSprite(&tft); 
 
+
+bool ChickenBedTime(void){
+   getLocalTime(&timeinfo);
+   sun.setCurrentDate(1900+timeinfo.tm_year,timeinfo.tm_mon,timeinfo.tm_mday);
+   const double sunset_total_minutes = sun.calcSunset();
+   {
+      Serial.printf("time=%d:%d ",timeinfo.tm_hour,timeinfo.tm_min);
+      Serial.printf("data=%d-%d-%d ",1900+timeinfo.tm_year,timeinfo.tm_mon,timeinfo.tm_mday);
+      const double sunset_hours= int(sunset_total_minutes/60);
+      const double sunset_min  = int(sunset_total_minutes)%60;    
+      Serial.printf("Sunset= %f %f\n", sunset_hours,sunset_min);
+   }
+   const double now_minutes = timeinfo.tm_hour *60 + timeinfo.tm_min;
+   if (sunset_total_minutes > now_minutes && sunset_total_minutes  < now_minutes + 30)
+      return true;
+   else
+      return false;   
+}
+
+bool BackLightEnableTime(void){
+   getLocalTime(&timeinfo);
+   sun.setCurrentDate(1900+timeinfo.tm_year,timeinfo.tm_mon,timeinfo.tm_mday);
+   const double sunset_total_minutes = sun.calcSunset();
+   const double sunrise_total_minutes = sun.calcSunrise();
+   if(1){
+      Serial.printf("BackLightEnableTime() "); 
+      Serial.printf("time=%d:%d ",timeinfo.tm_hour,timeinfo.tm_min);
+      Serial.printf("data=%d-%d-%d ",1900+timeinfo.tm_year,timeinfo.tm_mon,timeinfo.tm_mday);
+      const double sunset_hours= int(sunset_total_minutes/60);
+      const double sunset_min  = int(sunset_total_minutes)%60;    
+      const double sunrise_hours= int(sunrise_total_minutes/60);
+      const double sunrise_min  = int(sunrise_total_minutes)%60;    
+      Serial.printf("Sunrise= %.1f %.1f ", sunrise_hours,sunrise_min);
+      Serial.printf("Sunset= %.1f %.1f ", sunset_hours ,sunset_min);
+   }
+   const double now_minutes = timeinfo.tm_hour *60 + timeinfo.tm_min;
+   if (now_minutes + 90 > sunset_total_minutes  ){
+      Serial.printf("Late\n");
+      return false;
+   }
+   if (now_minutes -30 < sunrise_total_minutes  ){
+      Serial.printf("Early\n");
+      return false;
+   }
+   Serial.printf("Daytime\n");
+   return true;
+}
 
 int limit(int in, int min, int max){
    if(in < min)
@@ -454,8 +507,10 @@ void Dial( float value){
 
 
 void setup() {
-Serial.begin(115200);
-   Serial.printf("Roost version 1.2/n");
+   Serial.begin(115200);
+   Serial.printf("Roost version 1.3\n");
+   sun.setPosition(LOCAL_LONGITUDE, LOCAL_LATITUDE, LOCAL_TIMEZONE);
+   sun.setTZOffset(LOCAL_TIMEZONE);
 
    tft.init();
    tft.setRotation(1); //This is the display in landscape
@@ -695,24 +750,26 @@ void callback(char* topic, byte* message, unsigned int length) {
 
   //only update once on the final mqtt message topic of the set
    if(Topic=="roost/hot_water_tank_bottom"){
-      getLocalTime(&timeinfo);
-
-      Serial.printf("time=%d %d\n",timeinfo.tm_hour,timeinfo.tm_min);
-      const int DST=0;
-      if(timeinfo.tm_hour+DST>7 && 
-         timeinfo.tm_hour+DST<21)
-      {
-      tft.fillScreen(TFT_BLACK);
-      ledcAnalogWrite(LEDC_CHANNEL_0, 255);
-      Dial(latest_data.power);
-      HotWater(latest_data.hot_water_tank_top,
-               latest_data.hot_water_tank_upper,
-               latest_data.hot_water_tank_lower,   
-               latest_data.hot_water_tank_bottom,
-               latest_data.hotwater_minutes );
-      //Energy(latest_data.energy);
-      TadoDraw();
-      Ashp_Draw(latest_data.ashp_power ,  latest_data.ashp_energy_today);
+      
+      if (BackLightEnableTime()){
+         tft.fillScreen(TFT_BLACK);
+         ledcAnalogWrite(LEDC_CHANNEL_0, 255);
+         Dial(latest_data.power);
+         HotWater(latest_data.hot_water_tank_top,
+                  latest_data.hot_water_tank_upper,
+                  latest_data.hot_water_tank_lower,   
+                  latest_data.hot_water_tank_bottom,
+                  latest_data.hotwater_minutes );
+         //Energy(latest_data.energy);
+         TadoDraw();
+         Ashp_Draw(latest_data.ashp_power ,  latest_data.ashp_energy_today);
+         if(ChickenBedTime()){
+            //tft.setFreeFont(FF18);                 // Select the font
+            tft.drawString("CHICKENS BEDTIME ",50,100 );
+         }
+         //else{
+         //    tft.drawString("CHICKENS UPTIME",50,100 );
+         // }
       }else{
          ledcAnalogWrite(LEDC_CHANNEL_0, 0);
       }
@@ -779,6 +836,8 @@ void reconnect() {
    }
 }
 void loop() {
+//   static int looping=0; 
+//   Serial.printf("Loop %d \n",looping);
    if (ts.tirqTouched() && ts.touched()) {
       TS_Point p = ts.getPoint();
       int screen_x=map(p.x,290,3670,0,320);
@@ -797,7 +856,14 @@ void loop() {
       {
          ledcAnalogWrite(LEDC_CHANNEL_0, 255); // On full brightness
          tft.fillScreen(TFT_BLACK);
-         if (screen_x<50){
+         if(screen_y < 50){
+            if(ChickenBedTime()){
+               tft.drawString("CHICKENS BEDTIME ",50,100 );
+            }else{
+               tft.drawString("CHICKENS UPTIME",50,100 );
+            }
+         }
+         else if (screen_x<50){
             PowersGraph();
          }else if (screen_x<280){
             Dial(latest_data.power);
