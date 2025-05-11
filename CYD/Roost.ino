@@ -9,17 +9,15 @@
 #include <sunset.h>
 
 SunSet sun;
-
+bool chicken_bed_time = false;
 
 #include "icons.h" // Roost Icons.
 
+#include "settings.h"
 // Replace the next variables with your SSID/Password combination
 
 #include "mywifi.h"
 
-// Add your MQTT Broker IP address, example:
-//const char* mqtt_server = "192.168.1.144";
-const char* mqtt_server = "192.168.1.250";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -112,10 +110,17 @@ bool ChickenBedTime(void){
       Serial.printf("Sunset= %f %f\n", sunset_hours,sunset_min);
    }
    const double now_minutes = timeinfo.tm_hour *60 + timeinfo.tm_min;
-   if (sunset_total_minutes > now_minutes && sunset_total_minutes  < now_minutes + 30)
+
+
+   
+   if (now_minutes > sunset_total_minutes-CHICKEN_BEFORE_SUNSET   && 
+       now_minutes < sunset_total_minutes+CHICKEN_AFTER_SUNSET ){
+      chicken_bed_time=true;   
       return true;
-   else
+   }else{
+      chicken_bed_time = false;
       return false;   
+   }
 }
 
 bool BackLightEnableTime(void){
@@ -135,11 +140,11 @@ bool BackLightEnableTime(void){
       Serial.printf("Sunset= %.1f %.1f ", sunset_hours ,sunset_min);
    }
    const double now_minutes = timeinfo.tm_hour *60 + timeinfo.tm_min;
-   if (now_minutes + 90 > sunset_total_minutes  ){
+   if (now_minutes  > sunset_total_minutes+DISPLAY_AFTER_SUNSET  ){
       Serial.printf("Late\n");
       return false;
    }
-   if (now_minutes -30 < sunrise_total_minutes  ){
+   if (now_minutes  < sunrise_total_minutes +DISPLAY_AFTER_SUNRISE ){
       Serial.printf("Early\n");
       return false;
    }
@@ -836,7 +841,19 @@ void reconnect() {
    }
 }
 void loop() {
-//   static int looping=0; 
+   static int looping=0;
+   looping++;
+   
+   if (chicken_bed_time){
+      //Serial.printf("chicken_bed_time\n");
+      if(looping%4000==0){
+         if(looping%8000==0)
+            ledcAnalogWrite(LEDC_CHANNEL_0, 255);
+         else
+            ledcAnalogWrite(LEDC_CHANNEL_0, 32);
+         }
+   }
+
 //   Serial.printf("Loop %d \n",looping);
    if (ts.tirqTouched() && ts.touched()) {
       TS_Point p = ts.getPoint();
