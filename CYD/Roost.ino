@@ -877,8 +877,26 @@ void loop() {
             if(ChickenBedTime()){
                tft.drawString("CHICKENS BEDTIME ",50,100 );
             }else{
-               tft.drawString("CHICKENS UPTIME",50,100 );
+               tft.drawString("CHICKENS UPTIME",20,30 );
             }
+            tft.drawString("Now "                    , 20,50 );
+            tft.drawNumber(timeinfo.tm_hour          ,170,50 );
+            tft.drawNumber(timeinfo.tm_min           ,190,50 );
+            tft.drawString("Sunrise "                , 20,70 );
+            tft.drawNumber(sun.calcSunrise()/60      ,170,70 );
+            tft.drawNumber(int(sun.calcSunrise())%60 ,190,70 );
+            tft.drawString("Sunset "                 , 20,90 );
+            tft.drawNumber(sun.calcSunset()/60       ,170,90 );
+            tft.drawNumber(int(sun.calcSunset())%60  ,190,90 );
+            tft.drawString("Chicken Before "         , 20,110 );
+            tft.drawNumber(CHICKEN_BEFORE_SUNSET     ,170,110 );
+            tft.drawString("Chicken After "          , 20,130 );
+            tft.drawNumber(CHICKEN_AFTER_SUNSET      ,170,130 );
+            tft.drawString("Display after sunrise"   , 20,150 );
+            tft.drawNumber(DISPLAY_AFTER_SUNRISE     ,170,150 );
+            tft.drawString("Display After sunset"    , 20,170 );
+            tft.drawNumber(DISPLAY_AFTER_SUNSET      ,170,170 );
+            
          }
          else if (screen_x<50){
             PowersGraph();
