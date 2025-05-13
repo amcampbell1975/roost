@@ -113,8 +113,8 @@ bool ChickenBedTime(void){
 
 
    
-   if (now_minutes > sunset_total_minutes-CHICKEN_BEFORE_SUNSET   && 
-       now_minutes < sunset_total_minutes+CHICKEN_AFTER_SUNSET ){
+   if (now_minutes > sunset_total_minutes+CHICKEN_AFTER_SUNSET   && 
+       now_minutes < sunset_total_minutes+CHICKEN_FLASH_TIME ){
       chicken_bed_time=true;   
       return true;
    }else{
@@ -900,10 +900,10 @@ void loop() {
             tft.drawString("Sunset "                 , 20,110 );
             tft.drawNumber(sun.calcSunset()/60       ,170,110 );
             tft.drawNumber(int(sun.calcSunset())%60  ,190,110 );
-            tft.drawString("Chicken Before "         , 20,130 );
-            tft.drawNumber(CHICKEN_BEFORE_SUNSET     ,170,130 );
-            tft.drawString("Chicken After "          , 20,150 );
-            tft.drawNumber(CHICKEN_AFTER_SUNSET      ,170,150 );
+            tft.drawString("Chicken After "          , 20,130 );
+            tft.drawNumber(CHICKEN_AFTER_SUNSET      ,170,130 );
+            tft.drawString("Chicken Duration "       , 20,150 );
+            tft.drawNumber(CHICKEN_FLASH_TIME        ,170,150 );
             tft.drawString("Display after sunrise"   , 20,170 );
             tft.drawNumber(DISPLAY_AFTER_SUNRISE     ,170,170 );
             tft.drawString("Display After sunset"    , 20,190 );
