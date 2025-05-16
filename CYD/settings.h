@@ -5,11 +5,11 @@ const int    LOCAL_TIMEZONE  =  1;
 
 // Chicken Bedtime
 const double CHICKEN_AFTER_SUNSET  = 10;
-const double CHICKEN_FLASH_TIME    = 15;
+const double CHICKEN_FLASH_TIME    = 30;
 
 // Display ON OFF Time
-const double DISPLAY_AFTER_SUNRISE =  60;
-const double DISPLAY_AFTER_SUNSET  =  60;
+const double DISPLAY_AFTER_SUNRISE =  5;
+const double DISPLAY_AFTER_SUNSET  =  90;
 
 // MQTT Server
 const char* mqtt_server = "192.168.1.250";
