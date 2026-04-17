@@ -1,6 +1,5 @@
 # https://community.home-assistant.io/t/midea-branded-ac-s-with-esphome-no-cloud/265236/703?page=36
 
-
 import minimalmodbus
 import serial
 import time
@@ -9,10 +8,6 @@ import os
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
-
-
-
-
 
 instrument = minimalmodbus.Instrument('/dev/ttyUSB0', 1)  # port name, slave address (in decimal)
 instrument.serial.baudrate = 9600
@@ -24,15 +19,13 @@ instrument.serial.timeout  = 1.00          # seconds
 instrument.mode = minimalmodbus.MODE_RTU  
 instrument.clear_buffers_before_each_transaction = True
 instrument.debug=False
-## Read Water Tank Temperature
 
 
 logger = logging.getLogger('mylogger')
 logging.basicConfig(level=logging.INFO)
-handler = RotatingFileHandler('/tmp/midea.log.txt', maxBytes=100000, backupCount=3) 
+handler = RotatingFileHandler('/tmp/midea_mqtt.log.txt', maxBytes=100000, backupCount=3) 
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
-
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
@@ -44,9 +37,6 @@ def on_connect(client, userdata, flags, rc):
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     #client.subscribe("roost/power")
-
-
-
 
 def Modbus_HW(enable=True, temperature=45):# min=20 Max=60
     fp= open("hotwater_log.txt", "a")
@@ -64,9 +54,6 @@ def Modbus_HW(enable=True, temperature=45):# min=20 Max=60
 
 Modbus_HW(enable=True, temperature=40)
 Modbus_HW(enable=False, temperature=21)
-set_temperature=21
-hw_enable=0
-
 
 import time
 time.sleep(30)
@@ -86,44 +73,58 @@ while True:
    if t.tm_hour == 4 and t.tm_min == 0:
         Modbus_HW(enable=True, temperature=40)
         logger.info("Enable HW")
-        set_temperature=40;
-        hw_enable=1
 
    if t.tm_hour == 5 and t.tm_min == 0:
         Modbus_HW(enable=False, temperature=21)
         logger.info("Disable HW")
-        set_temperature=21;
-        hw_enable=0
 
 #   if t.tm_hour == 15 and t.tm_min == 30:
 #        Modbus_HW(enable=True, temperature=45)
 #        logger.info("Enable HW")
-#        set_temperature=40;
-#        hw_enable=1
 
    if t.tm_hour == 20 and t.tm_min == 0:
         Modbus_HW(enable=False, temperature=20)
         logger.info("Disable HW")
-        set_temperature=20;
-        hw_enable=0
 
 #   if t.tm_hour == 16 and t.tm_min ==23:
 #        Modbus_HW(enable=False, temperature=20)
+#        logger.info("Enable HW")
 
 
-   logger.info("midea/set_temperature %d" %set_temperature)
-   logger.info("midea/hw_enable %d"       %hw_enable)
+   read_current            = instrument.read_register(118, 0)  # Registernumber, number of decimals
+   read_voltage            = instrument.read_register(119, 0)  # Registernumber, number of decimals
+   read_power_mode         = instrument.read_register(0, 0)    # Registernumber, number of decimals
+   read_fan_speed          = instrument.read_register(102, 0)  # Registernumber, number of decimals
+   read_target_temperature = instrument.read_register(4, 0)    # Registernumber, number of decimals
+   read_water_in           = instrument.read_register(104, 0)  # Registernumber, number of decimals
+   read_water_out          = instrument.read_register(105, 0)  # Registernumber, number of decimals
+   read_t3                 = instrument.read_register(106, 0)  # Registernumber, number of decimals
+   read_t4                 = instrument.read_register(107, 0)  # Registernumber, number of decimals
+   read_outside_temp       = instrument.read_register(136, 0)  # Registernumber, number of decimals
 
-   client.publish("midea/set_temperature", str(set_temperature))
-   client.publish("midea/hw_enable",      str(hw_enable))
+   logger.info("midea/current %d"            %read_current)
+   logger.info("midea/voltage %d"            %read_voltage)
+   logger.info("midea/power_mode %d"         %read_power_mode) #(HW=bit2 CH=bit1)
+   logger.info("midea/fan_speed %d"          %read_fan_speed)
+   logger.info("midea/target_temperature %d" %read_target_temperature)
+   logger.info("midea/water_in %d"           %read_water_in)
+   logger.info("midea/water_out %d"          %read_water_out)
+   logger.info("midea/t3 %d"                 %read_t3)
+   logger.info("midea/t4 %d"                 %read_t4)
+   logger.info("midea/outside_temperature %d" %read_outside_temp)
+
+   client.publish("midea/current"            , str(read_current))
+   client.publish("midea/voltage"            , str(read_voltage))
+   client.publish("midea/power_mode"         , str(read_power_mode))
+   client.publish("midea/fan_speed"          , str(read_fan_speed))
+   client.publish("midea/target_temperature" , str(read_target_temperature))
+   client.publish("midea/water_in"           , str(read_water_in))
+   client.publish("midea/water_out"          , str(read_water_out))
+   client.publish("midea/t3"                 , str(read_t3))
+   client.publish("midea/t4"                 , str(read_t4))
+   client.publish("midea/outside_temperature", str(read_outside_temp))
 
    time.sleep(30)
-
-
-
-   #    print("0  Power On/Off  [Set] =>  " , bin(value))
-
-
 
 instrument.serial.close()
 
