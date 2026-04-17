@@ -75,6 +75,11 @@ struct {
   float tado_requested_temperature[9]={0};
   float tado_valve[9]={0};
   float tado_humidity[9]={0};
+  float midea_current;
+  float midea_voltage;
+  float midea_power_mode;
+  float midea_fan_speed;
+  float midea_target_temperature;
 } latest_data;
 
 struct{
@@ -240,6 +245,7 @@ void Ashp_Draw(float ashp_power, float ashp_energy_today){
       colour_bar_index=constrain(colour_bar_index,0,4);
       sprite_ashp.fillRect(45,37-height,9,height,colour_bar[colour_bar_index] );
       sprite_ashp.drawString(String(float(ashp_energy_today )) + " KWh" , 0,45+18, 2);
+      sprite_ashp.drawString(String(float(latest_data.midea_target_temperature )) + " C" , 0,45+18+18, 2);
     }
 
    // sprite_tank.pushSprite(250, 20, TFT_TRANSPARENT);
@@ -752,6 +758,16 @@ void callback(char* topic, byte* message, unsigned int length) {
       latest_data.tado_valve[7] = Message.toFloat();
    }else if(Topic=="tado/valve/Kitchen"){
       latest_data.tado_valve[8] = Message.toFloat();
+   }else if(Topic=="midea/current"){
+      latest_data.midea_current = Message.toFloat();
+   }else if(Topic=="midea/voltage"){
+      latest_data.midea_voltage = Message.toFloat();
+   }else if(Topic=="midea/power_mode"){
+      latest_data.midea_power_mode = Message.toFloat();
+   }else if(Topic=="midea/fan_speed"){
+      latest_data.midea_fan_speed = Message.toFloat();
+   }else if(Topic=="midea/target_temperature"){
+      latest_data.midea_target_temperature = Message.toFloat();
    }
 
 
@@ -811,6 +827,13 @@ void reconnect() {
          client.subscribe("roost/immersion_power");
          client.subscribe("roost/ashp_power");
          client.subscribe("roost/ashp_energy_today");
+         client.subscribe("midea/current");
+         client.subscribe("midea/voltage");
+         client.subscribe("midea/power_mode");
+         client.subscribe("midea/fan_speed");
+         client.subscribe("midea/target_temperature");
+         client.subscribe("midea/water_in");
+         client.subscribe("midea/water_out");
          client.subscribe("tado/current_temp/VA Bedroom");
          client.subscribe("tado/current_temp/Maddie");
          client.subscribe("tado/current_temp/Seb");
@@ -909,6 +932,17 @@ void loop() {
             tft.drawString("Display After sunset"    , 20,190 );
             tft.drawNumber(DISPLAY_AFTER_SUNSET      ,170,190 );
 
+            tft.drawString("T", 40-10,210 );
+            tft.drawString("C", 80-10,210 );
+            tft.drawString("V",120-10,210 );
+            tft.drawString("P",160-10,210 );
+            tft.drawString("F",200-10,210 );
+
+            tft.drawNumber(int(latest_data.midea_target_temperature)     , 40,210 );
+            tft.drawNumber(int(latest_data.midea_current)                , 80,210 );
+            tft.drawNumber(int(latest_data.midea_voltage)                ,120,210 );
+            tft.drawNumber(int(latest_data.midea_power_mode)             ,160,210 );
+            tft.drawNumber(int(latest_data.midea_fan_speed)              ,200,210 );
          }
          else if (screen_x<50){
             PowersGraph();
