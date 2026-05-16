@@ -80,7 +80,7 @@ Modbus_HW(enable=True, temperature=40)
 Modbus_HW(enable=False, temperature=21)
 
 import time
-time.sleep(3)
+time.sleep(30)
 
 
 client = mqtt.Client()
