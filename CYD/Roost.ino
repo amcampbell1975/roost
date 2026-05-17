@@ -103,6 +103,71 @@ TFT_eSprite sprite_energy= TFT_eSprite(&tft);
 TFT_eSprite sprite_tado  = TFT_eSprite(&tft); 
 
 
+void MideaHotWaterTemperature(void){
+   const int BOX_SIZE=80; 
+   const int BOX_GAP=20; 
+   
+   tft.fillScreen(TFT_BLACK);
+   tft.drawRect((1*BOX_GAP)+(BOX_SIZE*0), 100, BOX_SIZE,BOX_SIZE, TFT_DARKGREY);
+   tft.drawRect((2*BOX_GAP)+(BOX_SIZE*1), 100, BOX_SIZE,BOX_SIZE, TFT_DARKGREY);
+   tft.drawRect((3*BOX_GAP)+(BOX_SIZE*2), 100, BOX_SIZE,BOX_SIZE, TFT_DARKGREY);
+   tft.setTextColor(TFT_WHITE, TFT_BLACK );
+   tft.drawString("OFF" , (1*BOX_GAP) +(BOX_SIZE*0) + 10 , 100, 2);
+   tft.drawString("40 C", (2*BOX_GAP) +(BOX_SIZE*1) + 10 , 100, 2);
+   tft.drawString("50 C", (3*BOX_GAP) +(BOX_SIZE*2) + 10 , 100, 2);
+
+
+   int timeout=2000;
+   while(timeout>0){
+      delay(1);
+      if(0){
+         String text=String(timeout) + "    ";
+         tft.drawString(text, 10, 40, 2);
+      }
+      if (ts.tirqTouched() && ts.touched()) {
+         String text;
+
+         TS_Point p = ts.getPoint();
+         int screen_x=map(p.x,290,3670,0,320);
+         int screen_y=map(p.y,390,3740,0,240);
+         
+         if (screen_y > 100 && screen_y < 100+BOX_SIZE){
+            if (screen_x > (1*BOX_GAP)+(BOX_SIZE*0) && screen_x < (1*BOX_GAP)+(BOX_SIZE*0)+BOX_SIZE){
+               text+="OFF";
+               tft.drawRect((1*BOX_GAP)+(BOX_SIZE*0), 100, BOX_SIZE,BOX_SIZE, TFT_WHITE);
+               // Serial.println("Midea Hot Water OFF");
+               client.publish("midea/set_temperature","0");
+               delay(500);
+               break;   
+            }
+            if (screen_x > (2*BOX_GAP)+(BOX_SIZE*1) && screen_x < (2*BOX_GAP)+(BOX_SIZE*1)+BOX_SIZE){
+               text+="40 C";
+               tft.drawRect((2*BOX_GAP)+(BOX_SIZE*1), 100, BOX_SIZE,BOX_SIZE, TFT_WHITE);
+               // Serial.println("Midea Hot Water 40 C");
+               client.publish("midea/set_temperature","40");
+               delay(500);
+               break;
+            }
+            if (screen_x > (3*BOX_GAP)+(BOX_SIZE*2) && screen_x < (3*BOX_GAP)+(BOX_SIZE*2)+BOX_SIZE){
+               text+="50 C";
+               tft.drawRect((3*BOX_GAP)+(BOX_SIZE*2), 100, BOX_SIZE,BOX_SIZE, TFT_WHITE); 
+               // Serial.println("Midea Hot Water 50 C");
+               client.publish("midea/set_temperature","50");
+               delay(500);
+               break;
+            }
+         }
+
+         text+=String(screen_x)+" "+String(screen_y)+ "   "+ String(timeout) + "    ";
+         tft.drawString(text, 10, 10, 2);
+         
+      }
+      timeout-=1;
+   }      
+}  
+
+
+
 bool ChickenBedTime(void){
    getLocalTime(&timeinfo);
    sun.setCurrentDate(1900+timeinfo.tm_year,timeinfo.tm_mon,timeinfo.tm_mday);
@@ -245,7 +310,10 @@ void Ashp_Draw(float ashp_power, float ashp_energy_today){
       colour_bar_index=constrain(colour_bar_index,0,4);
       sprite_ashp.fillRect(45,37-height,9,height,colour_bar[colour_bar_index] );
       sprite_ashp.drawString(String(float(ashp_energy_today )) + " KWh" , 0,45+18, 2);
-      sprite_ashp.drawString(String(float(latest_data.midea_target_temperature )) + " C" , 0,45+18+18, 2);
+      if (latest_data.midea_target_temperature==20)
+         sprite_ashp.drawString("Off" , 0,45+18+18, 2);
+      else
+         sprite_ashp.drawString(String(float(latest_data.midea_target_temperature )) + " C" , 0,45+18+18, 2);
     }
 
    // sprite_tank.pushSprite(250, 20, TFT_TRANSPARENT);
@@ -549,7 +617,7 @@ void setup() {
 
    tft.fillScreen(TFT_BLACK);
 
-
+ 
 
    tft.pushImage(10, 200, icon_fire_width, icon_fire_height, icon_fire);
    tft.pushImage(50, 200, icon_sun_width,  icon_sun_height,  icon_sun);
@@ -562,6 +630,12 @@ void setup() {
    mySpi.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
    ts.begin(mySpi);
    ts.setRotation(1);
+
+   //MideaHotWaterTemperature();
+   //sleep(10);
+
+
+
 
    for(int i=0;i<20;i++){
       const uint8_t   red  = map(i,0,20,255,  0);
@@ -577,11 +651,11 @@ void setup() {
       previous.bot[i]=20;
    }
    
-   delay(2000);
+   //delay(2000);
 
 
    //while(1) 
-   {
+   if (0){   
       for (int i=0; i< 2000; i+=50){
          Dial(i);
          AddNewPower(i);
@@ -878,8 +952,6 @@ void loop() {
             ledcAnalogWrite(LEDC_CHANNEL_0, 32);
          }
    }
-
-//   Serial.printf("Loop %d \n",looping);
    if (ts.tirqTouched() && ts.touched()) {
       TS_Point p = ts.getPoint();
       int screen_x=map(p.x,290,3670,0,320);
@@ -899,7 +971,21 @@ void loop() {
       {
          ledcAnalogWrite(LEDC_CHANNEL_0, 255); // On full brightness
          tft.fillScreen(TFT_BLACK);
-         if(screen_y < 50){
+         
+         if(screen_x>180-2 && screen_x<180-2+70 &&  screen_y<20+100  && screen_y> 20){
+            MideaHotWaterTemperature();
+            tft.fillScreen(TFT_BLACK);
+            Dial(latest_data.power);
+            HotWater(latest_data.hot_water_tank_top,
+                     latest_data.hot_water_tank_upper,
+                     latest_data.hot_water_tank_lower,  
+                     latest_data.hot_water_tank_bottom,
+                     latest_data.hotwater_minutes );
+            Ashp_Draw(latest_data.ashp_power ,  latest_data.ashp_energy_today);
+            Energy(latest_data.energy);
+            TadoDraw();
+         }
+         else if(screen_y < 50){
             if(ChickenBedTime()){
                tft.drawString("CHICKENS BEDTIME ",50,100 );
             }else{
