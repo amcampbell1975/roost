@@ -29,5 +29,3 @@ python3 /home/alistair/solaredge/solaredge_mqtt.py &
 exit 0
 ```
 
-
-python3 /home/alistair/solaredge/.py &
