@@ -1,3 +1,10 @@
+# PIP packages
+```bash
+sudo pip3 install pymodbus  --break-system-package
+sudo pip3 install paho-mqtt --break-system-packages
+sudo pip3 install pyserial  --break-system-packages
+```
+
 # Setup auto run
 
 ```bash
