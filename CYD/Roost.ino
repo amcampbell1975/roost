@@ -1,6 +1,8 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <TFT_eSPI.h>
+#include <ArduinoJson.h>
+
 #define GFXFF 1
 #define FF18 &FreeSans12pt7b
 
@@ -80,6 +82,7 @@ struct {
   float midea_power_mode;
   float midea_fan_speed;
   float midea_target_temperature;
+  int   solaredge_power;
 } latest_data;
 
 struct{
@@ -581,7 +584,11 @@ void Dial( float value){
    int_value=abs((int_value/10)*10);
    sprite_power.setTextColor(TFT_WHITE,TFT_BLACK );
    sprite_power.drawString(String(int_value), 50,120, 4); // Left Aligned
+   sprite_power.drawString(String(float(latest_data.solaredge_power)/1000) + " KW", 50,20, 2);
+
+
    sprite_power.pushSprite(0, 0, TFT_TRANSPARENT);
+   
 }
 
 
@@ -842,8 +849,16 @@ void callback(char* topic, byte* message, unsigned int length) {
       latest_data.midea_fan_speed = Message.toFloat();
    }else if(Topic=="midea/target_temperature"){
       latest_data.midea_target_temperature = Message.toFloat();
+   }else if(Topic=="solaredge"){
+      //Serial.printf("solaredge power=%s\n",Message.c_str());
+      JsonDocument doc;
+      DeserializationError err = deserializeJson(doc, Message);
+      latest_data.solaredge_power = doc["watts"];
+      //Dial(latest_data.power);
+      Serial.printf("solaredge power=%d\n",latest_data.solaredge_power);
+   }else {
+      //Serial.printf("Unknown topic %s\n",Topic.c_str());
    }
-
 
   //only update once on the final mqtt message topic of the set
    if(Topic=="roost/hot_water_tank_bottom"){
@@ -926,6 +941,8 @@ void reconnect() {
          client.subscribe("tado/valve/Study");
          client.subscribe("tado/valve/Bathroom");
          client.subscribe("tado/valve/Kitchen");
+         client.subscribe("tado/valve/Kitchen");
+         client.subscribe("solaredge");
          //timeClienty");
          Serial.println( "subscribed to roost/...");
       } else {
