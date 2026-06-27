@@ -107,6 +107,15 @@ TFT_eSprite sprite_energy= TFT_eSprite(&tft);
 TFT_eSprite sprite_tado  = TFT_eSprite(&tft); 
 
 
+long map_clip(long x, long in_min, long in_max, long out_min, long out_max) {
+   long ret = map(x, in_min, in_max, out_min, out_max);
+   if(ret>out_min) return out_min;
+   if(ret<out_max) return out_max;
+   return ret;
+}
+
+
+
 void MideaHotWaterTemperature(void){
    const int BOX_SIZE=80; 
    const int BOX_GAP=20; 
@@ -406,46 +415,70 @@ void AddNewHotWater(float t0,float t1,float t2,float t3 ){
 
 void PowersGraph(void){
    const int G_HEIGHT=230;
-   for(int i=0;i<100;i+=10){
-      float h= map(i,0,100,G_HEIGHT,0  );
-      tft.drawFastHLine( 0, h,  320, TFT_DARKGREY);
+   const int P_MIN=-2000;
+   const int P_MAX= 4000;
+   // Draw grid lines
+   tft.setTextColor(TFT_WHITE, TFT_BLACK,false );   
+   for(int i=P_MIN;i<P_MAX;i+=500){
+      float h= map(i,P_MIN,P_MAX,G_HEIGHT,0  );
+      if(i==0)
+         tft.drawFastHLine( 0, h,  320, TFT_WHITE);
+      else
+         tft.drawFastHLine( 0, h,  320, TFT_DARKGREY);
+
+      if(i%1000==0)
+         tft.drawString(String(float(i)/1000) , 5, h-10, 2);
    }
+   // Vertical lines
    for(int i=0;i<320;i++){
       if((320-1-i)%60==0){
          tft.drawFastVLine( i, 0,  G_HEIGHT, TFT_DARKGREY);
+         // tft.drawPixel(i,G_HEIGHT+2 , TFT_WHITE); 
+         // tft.drawPixel(i,G_HEIGHT+3 , TFT_WHITE); 
       }
    }
-   //Serial.printf("HotGraph()\n");
+   // Draw Key
+   tft.setTextColor(TFT_YELLOW, TFT_BLACK, false); tft.drawString("Solar" ,15+0*50,3,2);
+   tft.setTextColor(TFT_ORANGE, TFT_BLACK, false); tft.drawString("HW"    ,15+1*50,3,2);
+   tft.setTextColor(TFT_GREEN,  TFT_BLACK, false); tft.drawString("Export",15+2*50,3,2);
+   tft.setTextColor(TFT_RED,    TFT_BLACK, false); tft.drawString("Import",15+3*50,3,2);
+
+
+   //Loop Though the 320 pixels and draw the graph
+   const int zero_hight= map(0,P_MIN,P_MAX,G_HEIGHT,0  );
    for(int i=0;i<320;i++){
-      //Serial.printf("%d - %f\n",i,temps[i]);
-      float h= map(powers[i],-4000,4000,G_HEIGHT,0  );
-      if (powers[i]>0){
-         tft.drawPixel(i,h , TFT_RED); 
-         tft.drawPixel(i,h+1 , TFT_RED); 
+      //Solar
+      // float h;
+      float h_solar;
+      float h_power;
+
+      h_solar= map_clip(solar_powers[i],P_MIN,P_MAX,G_HEIGHT,0  );
+      h_power= map_clip(powers[i]      ,P_MIN,P_MAX,G_HEIGHT,0  );
+      
+      if(h_power>h_solar){
+         // power first then solar
+         tft.drawFastVLine( i, h_power, zero_hight-h_power, TFT_RED);
+         if (solar_powers[i]>10)
+            tft.drawFastVLine( i, h_solar, zero_hight-h_solar, TFT_YELLOW);
       }else{
-         tft.drawPixel(i,h , TFT_GREEN); 
-         tft.drawPixel(i,h+1 , TFT_GREEN); 
+         if (solar_powers[i]>10)
+            tft.drawFastVLine( i, h_solar, zero_hight-h_solar, TFT_YELLOW);
+         tft.drawFastVLine( i, h_power, zero_hight-h_power, TFT_RED);
       }
       
-      h= map(immersion_powers[i],-4000,4000,G_HEIGHT,0  );
-      if (immersion_powers[i]>10){
-         tft.drawPixel(i,h , TFT_ORANGE);
-         tft.drawPixel(i,h+1 , TFT_ORANGE);
-      }   
-      h= map(solar_powers[i],-4000,4000,G_HEIGHT,0  );
-      if (solar_powers[i]>10){
-         tft.drawPixel(i,h , TFT_YELLOW);
-         tft.drawPixel(i,h+1 , TFT_YELLOW);
-      }   
-
-      
-
-      if((320-1-i)%60==0){
-         tft.drawPixel(i,G_HEIGHT+2 , TFT_WHITE); 
-         tft.drawPixel(i,G_HEIGHT+3 , TFT_WHITE); 
+      // Power Exporting
+      if (powers[i]<0){
+         tft.drawFastVLine( i, zero_hight, h_power-zero_hight,  TFT_GREEN); //zero_hight-h
       }
+      //immersion
+      const float h_immer= map_clip(immersion_powers[i],P_MIN,P_MAX,G_HEIGHT,0  );
+ //     if (immersion_powers[i]>10){
+         tft.drawFastVLine( i, h_immer, 5, TFT_ORANGE);
+//      }   
    }
-   tft.drawFastHLine( 0, G_HEIGHT+1,  320, TFT_WHITE);
+
+
+
 }
   
 void HotGraph(void){//float temperatures[10]){
@@ -455,9 +488,9 @@ void HotGraph(void){//float temperatures[10]){
       tft.drawFastHLine( 0, h,  320, TFT_DARKGREY);
    }
    for(int i=0;i<320;i++){
-      if((320-1-i)%60==0){
+      if( ((320-1-i)%( 90)) ==0 ){
          tft.drawFastVLine( i, 0,  G_HEIGHT, TFT_DARKGREY);
-         }
+      }
    }
    //Serial.printf("HotGraph()\n");
    for(int i=0;i<320;i++){
@@ -655,6 +688,12 @@ void setup() {
 
    //MideaHotWaterTemperature();
    //sleep(10);
+   //Init some random data
+   for(int i=0;i<320;i++){
+      AddNewPower(random(-2000,4000));
+      AddNewImmersion(random(0,1200));
+      AddNewSolar(random(0,2000));
+   }
 
 
 
