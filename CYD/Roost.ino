@@ -94,6 +94,7 @@ struct{
 
 float powers[320];
 float immersion_powers[320];
+float solar_powers[320];
 
 uint32_t water_temp_colour_scale[20];
 
@@ -386,6 +387,13 @@ void AddNewImmersion(float p ){
    immersion_powers[319]=p;
 }
 
+void AddNewSolar(float p ){
+  for (int i = 0; i <320-1 ; i++){
+    solar_powers[i]=solar_powers[i+1];
+    }
+   solar_powers[319]=p;
+}
+
 
 void AddNewHotWater(float t0,float t1,float t2,float t3 ){
    AddNewHotWaterTop(t0);
@@ -421,9 +429,16 @@ void PowersGraph(void){
       
       h= map(immersion_powers[i],-4000,4000,G_HEIGHT,0  );
       if (immersion_powers[i]>10){
+         tft.drawPixel(i,h , TFT_ORANGE);
+         tft.drawPixel(i,h+1 , TFT_ORANGE);
+      }   
+      h= map(solar_powers[i],-4000,4000,G_HEIGHT,0  );
+      if (solar_powers[i]>10){
          tft.drawPixel(i,h , TFT_YELLOW);
          tft.drawPixel(i,h+1 , TFT_YELLOW);
       }   
+
+      
 
       if((320-1-i)%60==0){
          tft.drawPixel(i,G_HEIGHT+2 , TFT_WHITE); 
@@ -856,6 +871,7 @@ void callback(char* topic, byte* message, unsigned int length) {
       latest_data.solaredge_power = doc["watts"];
       //Dial(latest_data.power);
       Serial.printf("solaredge power=%d\n",latest_data.solaredge_power);
+      AddNewSolar(latest_data.solaredge_power);
    }else {
       //Serial.printf("Unknown topic %s\n",Topic.c_str());
    }
