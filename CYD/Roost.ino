@@ -465,6 +465,7 @@ void PowersGraph(void){
             tft.drawFastVLine( i, h_solar, zero_hight-h_solar, TFT_YELLOW);
          tft.drawFastVLine( i, h_power, zero_hight-h_power, TFT_RED);
       }
+      tft.drawFastVLine( i, h_solar, 2, TFT_YELLOW);
       
       // Power Exporting
       if (powers[i]<0){
@@ -472,9 +473,9 @@ void PowersGraph(void){
       }
       //immersion
       const float h_immer= map_clip(immersion_powers[i],P_MIN,P_MAX,G_HEIGHT,0  );
- //     if (immersion_powers[i]>10){
+      if (immersion_powers[i]>10){
          tft.drawFastVLine( i, h_immer, 5, TFT_ORANGE);
-//      }   
+      }   
    }
 
 
