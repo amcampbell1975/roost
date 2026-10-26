@@ -213,20 +213,22 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
    sprite_ashp.pushImage(0, 0, icon_ashp_width, icon_ashp_height, icon_ashp_img);
 
    {
-      const float MAX_POWER = 2000;
-      const int colour_index = constrain(mapClip(ashp_power, 0, MAX_POWER, 0, 5), 0, 4);
-      snprintf(buf, sizeof buf, "%.2f KW", ashp_power / 1000.0f);
-      sprite_ashp.drawString(buf, 0, 30 + 18, 2);
-      if (ashp_power > 100)
-         sprite_ashp.fillCircle(21, 22, 15, colour_bar[colour_index]);
-   }
-   {
-      const float MAX_ENERGY = 15;
-      const int height = mapClip(ashp_energy_today, 0, MAX_ENERGY, 0, 30);
-      const int colour_index = constrain(mapClip(ashp_energy_today, 0, MAX_ENERGY, 0, 5), 0, 4);
+      // const float MAX_POWER = 2000;
+      // const int colour_index = constrain(mapClip(ashp_power, 0, MAX_POWER, 0, 5), 0, 4);
+      // if (ashp_power > 100)
+      //    sprite_ashp.fillCircle(21, 22, 15, colour_bar[colour_index]);
+
+      const float MAX_ENERGY = 1.5;
+      const float power_estimate = (latest_data.midea_current*latest_data.midea_voltage)/1000.0f; 
+      const int height = mapClip(power_estimate, 0, MAX_ENERGY, 0, 30);
+      const int colour_index = constrain(mapClip(power_estimate, 0, MAX_ENERGY, 0, 5), 0, 4);
       sprite_ashp.fillRect(45, 37 - height, 9, height, colour_bar[colour_index]);
-      snprintf(buf, sizeof buf, "%.2f KWh", ashp_energy_today);
-      sprite_ashp.drawString(buf, 0, 45 + 18, 2);
+
+      snprintf(buf, sizeof buf, "%.1f KW",power_estimate);
+      sprite_ashp.drawString(buf, 0, 30 + 18, 2);
+
+      //snprintf(buf, sizeof buf, "%.2f KWh", ashp_energy_today);
+      //sprite_ashp.drawString(buf, 0, 45 + 18, 2);
       // if (latest_data.midea_target_temperature == MIDEA_OFF_TARGET_TEMP) {
       //    sprite_ashp.drawString("Off", 0, 45 + 18 + 18, 2);
       // } else {
