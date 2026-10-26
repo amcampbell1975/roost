@@ -18,7 +18,17 @@
 #endif
 #include "config.h"
 #include "util.h"
-#include "icons.h" // Roost Icons.
+#include "src/generated/icon_ashp.h"   // Generated
+#include "src/generated/icon_grid.h"   // Generated
+#include "src/generated/icon_heater.h" // Generated
+#include "src/generated/icon_plug.h"   // Generated
+#include "src/generated/icon_sun.h"    // Generated
+// #include "src/generated/icon_" //
+// #include "src/generated/icon_" //
+// #include "src/generated/icon_" //
+// #include "src/generated/icon_" //
+// #include "src/generated/icon_" //
+
 
 /////////////////////////////////////
 // Globals
@@ -202,7 +212,7 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
    char buf[24];
 
    sprite_ashp.fillScreen(TFT_BLACK);
-   sprite_ashp.pushImage(0, 0, icon_ashp_width, icon_ashp_height, icon_ashp);
+   sprite_ashp.pushImage(0, 0, icon_ashp_width, icon_ashp_height, icon_ashp_img);
 
    {
       const float MAX_POWER = 2000;
@@ -275,7 +285,7 @@ static void HotWater() {
    sprite_tank.drawRect(0, 0, 60, 41 * 4, TFT_WHITE);
 
    if (latest_data.plug_heater == 1)
-      sprite_tank.pushImage(15, 70, icon_plug_width, icon_plug_height, icon_plug);
+      sprite_tank.pushImage(15, 70, icon_plug_width, icon_plug_height, icon_plug_img);
 
    sprite_tank.pushSprite(TANK_X, TANK_Y, TFT_TRANSPARENT);
 }
@@ -305,9 +315,9 @@ static void Dial(float value) {
       sprite_power.drawArc(80, 80, AS, 30, 45, angle + 180,      TFT_DARKGREY, TFT_DARKGREY, true);
    }
    if (value > 0)
-      sprite_power.pushImage(AS - 8, AS - 8, icon_grid_width, icon_grid_height, icon_grid);
+      sprite_power.pushImage(AS - 8, AS - 8, icon_grid_width, icon_grid_height, icon_grid_img);
    else
-      sprite_power.pushImage(AS - 8, AS - 8, icon_sun_width, icon_sun_height, icon_sun);
+      sprite_power.pushImage(AS - 8, AS - 8, icon_sun_width, icon_sun_height, icon_sun_img);
 
    int_value = abs((int_value / 10) * 10);
    char buf[24];
