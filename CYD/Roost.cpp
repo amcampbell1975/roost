@@ -227,21 +227,36 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
       sprite_ashp.fillRect(45, 37 - height, 9, height, colour_bar[colour_index]);
       snprintf(buf, sizeof buf, "%.2f KWh", ashp_energy_today);
       sprite_ashp.drawString(buf, 0, 45 + 18, 2);
-      if (latest_data.midea_target_temperature == MIDEA_OFF_TARGET_TEMP) {
-         sprite_ashp.drawString("Off", 0, 45 + 18 + 18, 2);
-      } else {
-         snprintf(buf, sizeof buf, "%.2f C", latest_data.midea_target_temperature);
-         sprite_ashp.drawString(buf, 0, 45 + 18 + 18, 2);
-      }
+      // if (latest_data.midea_target_temperature == MIDEA_OFF_TARGET_TEMP) {
+      //    sprite_ashp.drawString("Off", 0, 45 + 18 + 18, 2);
+      // } else {
+      //    snprintf(buf, sizeof buf, "%.2f C", latest_data.midea_target_temperature);
+      //    sprite_ashp.drawString(buf, 0, 45 + 18 + 18, 2);
+      // }
    }
    sprite_ashp.pushSprite(ASHP_X, ASHP_Y, TFT_TRANSPARENT);
 }
 static void Battery_Draw(float battery_power, float battery_energy) {
-
    sprite_battery.fillScreen(TFT_BLACK);
    sprite_battery.pushImage(0, 0, icon_battery_width, icon_battery_height, icon_battery_img);
-   sprite_battery.pushSprite(BATTERY_X, BATTERY_Y, TFT_TRANSPARENT);
+   {
+      char buf[24];
+      snprintf(buf, sizeof buf, "%.2f KW", battery_power);
+      sprite_battery.drawString(buf, 0, 45 +  0, 2);
+      snprintf(buf, sizeof buf, "%.2f KWh", battery_energy);
+      sprite_battery.drawString(buf, 0, 45 + 18, 2);
+   }
+   {
+      static const uint16_t colour_bar[5] = {TFT_RED, TFT_ORANGE, TFT_YELLOW, TFT_GREENYELLOW,  TFT_GREEN};
+      const float MAX_ENERGY = 5.00;
+      const int width = mapClip(battery_energy, 0, MAX_ENERGY, 0, 40);
+      const int colour_index = constrain(mapClip(battery_energy, 0, MAX_ENERGY, 0, 5), 0, 4);
+      
+      sprite_battery.fillRect(10, 25, 40,   10, TFT_LIGHTGREY);
+      sprite_battery.fillRect(10, 25, width,10, colour_bar[colour_index]);
+   }
 
+   sprite_battery.pushSprite(BATTERY_X, BATTERY_Y, TFT_TRANSPARENT);
 }
 
 
@@ -345,7 +360,7 @@ static void drawDashboard() {
 #endif
    TadoDraw();
    Ashp_Draw(latest_data.ashp_power, latest_data.ashp_energy_today);
-   Battery_Draw(0,0);
+   Battery_Draw(-5+ ((float)(rand()) / (float)(RAND_MAX))*10     ,((float)(rand()) / (float)(RAND_MAX))*5);
 }
 
 /////////////////////////////////////

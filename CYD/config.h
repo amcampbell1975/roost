@@ -73,7 +73,7 @@
 /////////////////////////////////////
 // Timing (milliseconds)
 /////////////////////////////////////
-#define REDRAW_MIN_INTERVAL_MS   3000   // at most one dashboard redraw per this period
+#define REDRAW_MIN_INTERVAL_MS  10000   // at most one dashboard redraw per this period
 #define TOUCH_HOLD_MS           20000   // keep a touched screen up this long
 #define TOUCH_RELEASE_MS          100   // debounce: finger must be up this long
 #define CHICKEN_FLASH_PERIOD_MS  2000   // backlight toggle period at chicken bedtime
