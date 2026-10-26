@@ -8,7 +8,12 @@ IMAGES_DIR = "images"
 OUTPUT_DIR = "src/generated"
 
 def rgb888_to_rgb565(r, g, b):
-    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+    #return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+    # Convert 24-bit RGB to 16-bit RGB565 format
+    rgb565 = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+    # SWAP BYTES: Fixes the color inversion (orange -> purple)
+    rgb565 = ((rgb565 & 0xFF) << 8) | (rgb565 >> 8)
+    return rgb565
 
 def convert_png_to_header(png_path, header_path):
     img = Image.open(png_path).convert("RGB")
