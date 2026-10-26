@@ -18,15 +18,12 @@
 #endif
 #include "config.h"
 #include "util.h"
-#include "src/generated/icon_ashp.h"   // Generated
-#include "src/generated/icon_grid.h"   // Generated
-#include "src/generated/icon_heater.h" // Generated
-#include "src/generated/icon_plug.h"   // Generated
-#include "src/generated/icon_sun.h"    // Generated
-// #include "src/generated/icon_" //
-// #include "src/generated/icon_" //
-// #include "src/generated/icon_" //
-// #include "src/generated/icon_" //
+#include "src/generated/icon_ashp.h"   
+#include "src/generated/icon_grid.h"   
+#include "src/generated/icon_heater.h" 
+#include "src/generated/icon_plug.h"   
+#include "src/generated/icon_sun.h"    
+#include "src/generated/icon_battery.h"
 // #include "src/generated/icon_" //
 
 
@@ -46,6 +43,7 @@ static TFT_eSprite sprite_ashp   = TFT_eSprite(&tft);
 static TFT_eSprite sprite_tank   = TFT_eSprite(&tft);
 static TFT_eSprite sprite_energy = TFT_eSprite(&tft);
 static TFT_eSprite sprite_tado   = TFT_eSprite(&tft);
+static TFT_eSprite sprite_battery= TFT_eSprite(&tft);
 
 // Tado rooms: MQTT topic suffix and the short label drawn on the grid. Order matters
 // (it is the index into the tado_* arrays and the position on the grid).
@@ -238,6 +236,16 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
    }
    sprite_ashp.pushSprite(ASHP_X, ASHP_Y, TFT_TRANSPARENT);
 }
+static void Battery_Draw(float battery_power, float battery_energy) {
+
+   sprite_battery.fillScreen(TFT_BLACK);
+   sprite_battery.pushImage(0, 0, icon_battery_width, icon_battery_height, icon_battery_img);
+   sprite_battery.pushSprite(BATTERY_X, BATTERY_Y, TFT_TRANSPARENT);
+
+}
+
+
+
 
 #if SHOW_ENERGY_BAR
 static void Energy(float energy) {
@@ -337,6 +345,7 @@ static void drawDashboard() {
 #endif
    TadoDraw();
    Ashp_Draw(latest_data.ashp_power, latest_data.ashp_energy_today);
+   Battery_Draw(0,0);
 }
 
 /////////////////////////////////////
@@ -811,11 +820,12 @@ void setup() {
    setBacklight(BACKLIGHT_FULL);
 
    tft.fillScreen(TFT_BLACK);
-   createSprite(sprite_power,  POWER_W,  POWER_H,  "power");
-   createSprite(sprite_tank,   TANK_W,   TANK_H,   "tank");
-   createSprite(sprite_ashp,   ASHP_W,   ASHP_H,   "ashp");
-   createSprite(sprite_energy, ENERGY_W, ENERGY_H, "energy");
-   createSprite(sprite_tado,   TADO_W,   TADO_H,   "tado");
+   createSprite(sprite_power,   POWER_W,   POWER_H,   "power");
+   createSprite(sprite_tank,    TANK_W,    TANK_H,    "tank");
+   createSprite(sprite_ashp,    ASHP_W,    ASHP_H,    "ashp");
+   createSprite(sprite_energy,  ENERGY_W,  ENERGY_H,  "energy");
+   createSprite(sprite_tado,    TADO_W,    TADO_H,    "tado");
+   createSprite(sprite_battery, BATTERY_W, BATTERY_H, "battery");
 
    // Touch screen
    mySpi.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);

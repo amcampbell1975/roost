@@ -38,6 +38,11 @@
 #define TADO_Y    170
 #define TADO_W    160
 #define TADO_H    70
+#define BATTERY_X    178
+#define BATTERY_Y    120
+#define BATTERY_W    70
+#define BATTERY_H    80
+
 
 /////////////////////////////////////
 // Touch screen
