@@ -200,9 +200,10 @@ async def cmd_run(args):
     if args.mqtt_user:
         client.username_pw_set(args.mqtt_user, args.mqtt_pass)
     client.will_set(f"{args.prefix}/status", "offline", retain=True)
+    client.on_connect = lambda c, u, f, rc, p=None: c.publish(
+        f"{args.prefix}/status", "online", retain=True)
     client.connect_async(args.mqtt_host, args.mqtt_port, keepalive=60)
     client.loop_start()
-    client.publish(f"{args.prefix}/status", "online", retain=True)
 
     # --- HomeKit ---
     zc = new_zeroconf()
@@ -262,9 +263,30 @@ async def cmd_run(args):
     await close_zeroconf(zc)
 
 
+async def cmd_dump(args):
+    """Print everything the bridge exposes (for troubleshooting)."""
+    zc = new_zeroconf()
+    c = make_controller(zc, args)
+    await c.async_start()
+    with open(args.pairing_file) as f:
+        saved = json.load(f)
+    pairing = c.load_pairing(args.alias, saved[args.alias])
+    accessories = await pairing.list_accessories_and_characteristics()
+    print(f"{len(accessories)} accessories")
+    for acc in accessories:
+        print(f"\naid={acc['aid']}")
+        for svc in acc["services"]:
+            print(f"  service {svc['type']}")
+            for ch in svc["characteristics"]:
+                print(f"    iid={ch['iid']} type={ch['type']} "
+                      f"desc={ch.get('description')} value={ch.get('value')}")
+    await c.async_stop()
+    await close_zeroconf(zc)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("command", choices=["discover", "pair", "run"])
+    p.add_argument("command", choices=["discover", "pair", "run", "dump"])
     p.add_argument("--pairing-file", default="tado_pairing.json")
     p.add_argument("--alias", default="tado")
     p.add_argument("--pin", help="HomeKit code from the bridge label, e.g. 123-45-678")
@@ -284,7 +306,7 @@ def main():
                         format="%(asctime)s %(levelname)s %(message)s")
     if args.command == "pair" and not args.pin:
         p.error("--pin is required for pair")
-    asyncio.run({"discover": cmd_discover, "pair": cmd_pair, "run": cmd_run}[args.command](args))
+    asyncio.run({"discover": cmd_discover, "pair": cmd_pair, "run": cmd_run, "dump": cmd_dump}[args.command](args))
 
 
 if __name__ == "__main__":
