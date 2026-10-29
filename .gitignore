@@ -1,3 +1,4 @@
 CYD/mywifi.h
 tado/tado_secret.py
 CYD/src/generated/*.h
+TadoMQTT/tado_pairing.json
