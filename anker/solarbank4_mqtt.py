@@ -19,11 +19,12 @@ Published topics (default prefix "solarbank4"):
   solarbank4/state              JSON with all values
   solarbank4/status             online / offline (retained, last-will)
 
-IMPORTANT: Anker does not publish the Solarbank 4 Modbus register map.
-Only pv_input_power (input register 10002, INT32, W) is confirmed from public
-sources. The other addresses are left as None below: run --scan, compare
-the values with what the Anker app shows (SOC %, W), then fill them in here or
-in a JSON file passed with --regmap.
+NOTE: Anker does not publish the Solarbank 4 Modbus register map. Registers
+below were found by --scan and checked against the Anker app:
+  battery_soc 10014 (confirmed), ac_output_power 10007 (confirmed),
+  pv_input_power 10002 (from public sources, test in daylight),
+  battery_power 10254 (unconfirmed, check sign while charging).
+Use --scan and --regmap my_regs.json to override any of them.
 """
 import argparse
 import json
@@ -46,9 +47,12 @@ log = logging.getLogger("solarbank4")
 # --------------------------------------------------------------------------
 REGISTERS = {
     "pv_input_power":  {"addr": 10002, "fn": "input", "type": "int32",  "scale": 1, "unit": "W", "invert": False},
-    "battery_soc":     {"addr": None,  "fn": "input", "type": "uint16", "scale": 1, "unit": "%", "invert": False},
-    "ac_output_power": {"addr": None,  "fn": "input", "type": "int32",  "scale": 1, "unit": "W", "invert": False},
-    "battery_power":   {"addr": None,  "fn": "input", "type": "int32",  "scale": 1, "unit": "W", "invert": False},
+    # Confirmed against the Anker app (SB4 E5000 Pro, 29 Oct 2026):
+    "battery_soc":     {"addr": 10014, "fn": "input", "type": "uint16", "scale": 1, "unit": "%", "invert": False},
+    "ac_output_power": {"addr": 10007, "fn": "input", "type": "uint16", "scale": 1, "unit": "W", "invert": False},
+    # NOT yet confirmed: read -1340 W while exporting 1250 W (negative = discharging),
+    # so invert=True publishes + = discharging. If the sign is wrong while charging, flip invert.
+    "battery_power":   {"addr": 10254, "fn": "input", "type": "int32",  "scale": 1, "unit": "W", "invert": True},
 }
 
 # Register ranges the official Anker integration polls on this device (for --scan)
