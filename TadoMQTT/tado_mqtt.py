@@ -225,12 +225,19 @@ async def cmd_run(args):
         loop.add_signal_handler(sig, stop.set)
 
     mapping, discovered = {}, set()
+    last_refresh = 0.0
     while not stop.is_set():
         try:
-            if not mapping:
+            # (Re)read the device list at start and every 10 minutes, so devices the
+            # bridge lists late, or that you add later, appear without a restart.
+            if not mapping or loop.time() - last_refresh > 600:
                 accessories = await pairing.list_accessories_and_characteristics()
-                mapping, _ = build_map(accessories)
-                log.info("Found %d readable characteristics", len(mapping))
+                new_mapping, _ = build_map(accessories)
+                if len(new_mapping) != len(mapping):
+                    log.info("Found %d readable characteristics on %d devices",
+                             len(new_mapping), len({n for n, _ in new_mapping.values()}))
+                mapping = new_mapping
+                last_refresh = loop.time()
 
             values = await pairing.get_characteristics(list(mapping.keys()))
             for key, data in values.items():
