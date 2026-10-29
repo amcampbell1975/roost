@@ -14,6 +14,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import re
 import signal
 import sys
@@ -78,12 +79,7 @@ def new_zeroconf() -> AsyncZeroconf:
 
 
 def make_controller(zc: AsyncZeroconf, args) -> Controller:
-    c = Controller(async_zeroconf_instance=zc)
-    try:
-        c.load_data(args.pairing_file)
-    except FileNotFoundError:
-        pass
-    return c
+    return Controller(async_zeroconf_instance=zc)
 
 
 async def cmd_discover(args):
@@ -143,8 +139,15 @@ async def cmd_pair(args):
                  "re-run with --device-id <its id>.")
     print(f"Pairing with {target.description.name} ({target.description.id})")
     finish = await target.async_start_pairing(args.alias)
-    await finish(args.pin)
-    c.save_data(args.pairing_file)
+    pairing = await finish(args.pin)
+    data = dict(pairing.pairing_data)
+    if not data:
+        await close_zeroconf(zc)
+        sys.exit("Pairing succeeded but returned no key data - not saving an empty file. "
+                 "Reset the bridge's HomeKit data and try again.")
+    with open(args.pairing_file, "w") as f:
+        json.dump({args.alias: data}, f, indent=2)
+    os.chmod(args.pairing_file, 0o600)
     print(f"Paired. Keys saved to {args.pairing_file} - keep this file safe and backed up.")
     await c.async_stop()
     await close_zeroconf(zc)
@@ -205,9 +208,15 @@ async def cmd_run(args):
     zc = new_zeroconf()
     c = make_controller(zc, args)
     await c.async_start()
-    if args.alias not in c.aliases:
-        sys.exit(f"No pairing named '{args.alias}'. Run the 'pair' step first.")
-    pairing = c.aliases[args.alias]
+    try:
+        with open(args.pairing_file) as f:
+            saved = json.load(f)
+    except FileNotFoundError:
+        saved = {}
+    if args.alias not in saved:
+        sys.exit(f"No pairing named '{args.alias}' in {args.pairing_file}. "
+                 "Run the 'pair' step first.")
+    pairing = c.load_pairing(args.alias, saved[args.alias])
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
