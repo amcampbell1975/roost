@@ -92,12 +92,38 @@ def decode(regs, typ, word_order):
 
 def poll(client, regmap, unit_id, word_order):
     out = {}
+    # The device can reject single-register reads at some addresses (the --scan worked
+    # because it reads blocks), so read blocks like the official integration and decode from them.
+    cache = {}  # (fn, addr) -> raw register value
+    needs = {}
+    for r in regmap.values():
+        if r.get("addr") is not None:
+            cnt = 2 if r["type"] in ("int32", "uint32") else 1
+            needs.setdefault(r["fn"], []).append((r["addr"], cnt))
+    for fn, items in needs.items():
+        # The device only answers the same aligned ranges the official integration polls
+        # (arbitrary start/length requests make it drop the connection), so read those.
+        blocks = []  # [start, end_exclusive]
+        for a, c in sorted(items):
+            rng = next(((s, e) for s, e in SCAN_RANGES if s <= a and a + c - 1 <= e), None)
+            blk = [rng[0], rng[1] + 1] if rng else [a, a + c]
+            if blk not in blocks:
+                blocks.append(blk)
+        for start, end in blocks:
+            try:
+                regs = read_regs(client, fn, start, end - start, unit_id)
+                for i, v in enumerate(regs):
+                    cache[(fn, start + i)] = v
+            except Exception as exc:
+                log.warning("block %s %d-%d failed: %s", fn, start, end - 1, exc)
+            time.sleep(0.2)
     for name, r in regmap.items():
         if r.get("addr") is None:
             continue
         try:
             count = 2 if r["type"] in ("int32", "uint32") else 1
-            raw = decode(read_regs(client, r["fn"], r["addr"], count, unit_id), r["type"], word_order)
+            regs = [cache[(r["fn"], r["addr"] + i)] for i in range(count)]
+            raw = decode(regs, r["type"], word_order)
             val = raw * r.get("scale", 1)
             if r.get("invert"):
                 val = -val
