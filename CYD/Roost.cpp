@@ -77,6 +77,8 @@ struct LatestData {
    float midea_fan_speed = 0;
    float midea_target_temperature = 0;
    float solaredge_power = 0;
+   float anker_power = 0;
+   float anker_energy = 0;
 };
 static LatestData latest_data;
 
@@ -239,6 +241,7 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
    sprite_ashp.pushSprite(ASHP_X, ASHP_Y, TFT_TRANSPARENT);
 }
 static void Battery_Draw(float battery_power, float battery_energy) {
+   LOGF("Battery_Draw: battery_power=%.2f battery_energy=%.2f\n", battery_power, battery_energy);
    sprite_battery.fillScreen(TFT_BLACK);
    sprite_battery.pushImage(0, 0, icon_battery_width, icon_battery_height, icon_battery_img);
    {
@@ -362,7 +365,7 @@ static void drawDashboard() {
 #endif
    TadoDraw();
    Ashp_Draw(latest_data.ashp_power, latest_data.ashp_energy_today);
-   Battery_Draw(-5+ ((float)(rand()) / (float)(RAND_MAX))*10     ,((float)(rand()) / (float)(RAND_MAX))*5);
+   Battery_Draw(latest_data.anker_power/1000.0, (latest_data.anker_energy/100.0) * 5.0f); // convert to KWh
 }
 
 /////////////////////////////////////
@@ -645,6 +648,8 @@ static const Binding BINDINGS[] = {
    {"roost/immersion_time",         &latest_data.hotwater_minutes,        60, NULL,            NULL},   // hours -> minutes
    {"roost/immersion_energy_today", &latest_data.hotwater_kwh,            1,  NULL,            NULL},
    {"roost/immersion_power",        NULL,                                 1,  NULL,            onImmersionPower},
+   {"anker/battery/curr/battery_power",&latest_data.anker_power,          1,  NULL,            NULL},
+   {"anker/battery/curr/battery_soc",  &latest_data.anker_energy,         1,  NULL,            NULL},
    {"roost/energy",                 &latest_data.energy,                  1,  NULL,            NULL},
    {"roost/ashp_power",             &latest_data.ashp_power,              1,  NULL,            NULL},
    {"roost/ashp_energy_today",      &latest_data.ashp_energy_today,       1,  NULL,            NULL},
@@ -707,8 +712,10 @@ static void onMessage(char* topic, byte* payload, unsigned int length) {
 }
 
 static void subscribeAll() {
-   for (int i = 0; i < BINDING_COUNT; i++)
+   for (int i = 0; i < BINDING_COUNT; i++){
       client.subscribe(BINDINGS[i].topic);
+      LOGF("MQTT Subscribe %d '%s' \n", i, BINDINGS[i].topic);
+   }
    char topic[64];
    for (int k = 0; k < 2; k++) {
       for (int r = 0; r < ROOM_COUNT; r++) {
