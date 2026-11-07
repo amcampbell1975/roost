@@ -97,6 +97,21 @@ static float powers[HISTORY_LEN];
 static float immersion_powers[HISTORY_LEN];
 static float solar_powers[HISTORY_LEN];
 
+// A history buffer that also knows how many real samples it holds, so a graph can skip the
+// not-yet-filled part instead of drawing it as zeros.
+struct Series {
+   float v[HISTORY_LEN];
+   int   count;                                   // samples received so far (capped at HISTORY_LEN)
+   void push(float x) {
+      if (!isfinite(x)) return;                   // never let NaN/inf reach the graph scaling
+      pushSample(v, x);
+      if (count < HISTORY_LEN) count++;
+   }
+   int first() const { return HISTORY_LEN - count; }   // index of the oldest valid sample
+};
+static Series anker_power_hist;    // W, + = discharging, - = charging
+static Series anker_soc_hist;      // charge level, %
+
 #define WATER_COLOURS 20
 static uint16_t water_temp_colour_scale[WATER_COLOURS];
 
@@ -348,7 +363,7 @@ static void Dial(float value) {
    } 
    {
       char buf[24];
-      sprite_power.pushImage(5, 80  , icon_anker_width, icon_anker_height, icon_anker_img);
+      sprite_power.pushImage(ANKER_ICON_X, ANKER_ICON_Y, icon_anker_width, icon_anker_height, icon_anker_img);
       char import_export[20];
       if (latest_data.power > 0) {
          strcpy(import_export, "discharge");
@@ -356,7 +371,7 @@ static void Dial(float value) {
          strcpy(import_export, "charge");
       }  
       snprintf(buf, sizeof buf, "%s %.2f KW", import_export, latest_data.anker_power / 1000.0f);
-      sprite_power.drawString(buf, 50, 80, 2);
+      sprite_power.drawString(buf, 50, ANKER_ICON_Y, 2);
    } 
 
 
@@ -499,6 +514,77 @@ static void HotGraph() {
    tft.drawFastHLine(0, GRAPH_HEIGHT + 1, SCREEN_W, TFT_WHITE);
 }
 
+// History of the Anker battery. Power is drawn as bars either side of a zero line (orange above =
+// discharging, green below = charging) auto-scaled in 500 W steps; the charge level is a cyan line
+// on a 0-100 % scale. The zero line therefore lines up with 50 %.
+static void AnkerGraph() {
+   char label[16];
+
+   // Symmetric power range, rounded up to the next 500 W (never less than 500 W).
+   float peak = 0;
+   for (int i = anker_power_hist.first(); i < HISTORY_LEN; i++) {
+      const float a = fabsf(anker_power_hist.v[i]);
+      if (a > peak) peak = a;
+   }
+   const float range  = peak <= 500 ? 500 : ceilf(peak / 500) * 500;   // W
+   const int   zero_y = mapClip(0, -range, range, GRAPH_HEIGHT, 0);
+
+   // Grid: -range, -range/2, 0, +range/2, +range, and a vertical line every 60 samples
+   for (int k = -2; k <= 2; k++) {
+      const int y = mapClip(range * k / 2, -range, range, GRAPH_HEIGHT, 0);
+      tft.drawFastHLine(0, y, SCREEN_W, k == 0 ? TFT_WHITE : TFT_DARKGREY);
+   }
+   for (int i = 0; i < HISTORY_LEN; i++) {
+      if ((HISTORY_LEN - 1 - i) % 60 == 0)
+         vline(i, 0, GRAPH_HEIGHT, TFT_DARKGREY);
+   }
+
+   // Power bars
+   for (int i = anker_power_hist.first(); i < HISTORY_LEN; i++) {
+      const float p = anker_power_hist.v[i];
+      const int   y = mapClip(p, -range, range, GRAPH_HEIGHT, 0);
+      if (p > 0)      vline(i, y, zero_y - y, TFT_ORANGE);        // discharging: above the zero line
+      else if (p < 0) vline(i, zero_y, y - zero_y, TFT_GREEN);    // charging: below it
+   }
+
+   // Charge level line (consecutive samples joined so steep changes stay connected)
+   int prev_y = -1;
+   for (int i = anker_soc_hist.first(); i < HISTORY_LEN; i++) {
+      const int y = mapClip(anker_soc_hist.v[i], 0, 100, GRAPH_HEIGHT, 0);
+      if (prev_y < 0) {
+         tft.drawPixel(i, y, TFT_CYAN);
+      } else {
+         const int top = y < prev_y ? y : prev_y;
+         const int h   = (y < prev_y ? prev_y - y : y - prev_y) + 1;
+         vline(i, top, h, TFT_CYAN);
+      }
+      prev_y = y;
+   }
+
+   // Axis labels (drawn last so they stay readable): power on the left, charge level on the right
+   for (int k = -2; k <= 2; k += 2) {
+      const int y  = mapClip(range * k / 2, -range, range, GRAPH_HEIGHT, 0);
+      const int ty = k == 2 ? y + 2 : y - 16;     // keep the text inside the graph
+      tft.setTextColor(TFT_WHITE, TFT_BLACK, false);
+      snprintf(label, sizeof label, "%.2fkW", range * k / 2000.0f);
+      tft.drawString(label, 2, ty, 2);
+      tft.setTextColor(TFT_CYAN, TFT_BLACK, false);
+      snprintf(label, sizeof label, "%d%%", (k + 2) * 25);
+      tft.drawString(label, SCREEN_W - 40, ty, 2);
+   }
+   // Key
+   tft.setTextColor(TFT_GREEN,  TFT_BLACK, false); tft.drawString("Charge",    60, 3, 2);
+   tft.setTextColor(TFT_ORANGE, TFT_BLACK, false); tft.drawString("Discharge", 116, 3, 2);
+   tft.setTextColor(TFT_CYAN,   TFT_BLACK, false); tft.drawString("Level",     200, 3, 2);
+}
+
+// True if a touch is on the Anker row of the power dial (icon plus its text).
+static bool touchedAnkerRow(int x, int y) {
+   return x >= POWER_X && x < POWER_X + POWER_W &&
+          y >= POWER_Y + ANKER_ICON_Y - ANKER_TOUCH_PAD &&
+          y <= POWER_Y + ANKER_ICON_Y + icon_anker_height + ANKER_TOUCH_PAD;
+}
+
 static void drawHM(const char* label, double minutes, int y) {
    tft.drawString(label, 20, y);
    tft.drawNumber((long)(minutes / 60), 170, y);
@@ -618,6 +704,8 @@ static void handleTouch(uint32_t now) {
       MideaHotWaterTemperature();
       tft.fillScreen(TFT_BLACK);
       drawDashboard();
+   } else if (touchedAnkerRow(x, y)) {
+      AnkerGraph();
    } else if (y < 50) {
       InfoScreen();
    } else if (x < 50) {
@@ -643,6 +731,8 @@ static void pushTankTop(float v)   { pushSample(previous.top, v); }
 static void pushTankUpper(float v) { pushSample(previous.upp, v); }
 static void pushTankLower(float v) { pushSample(previous.low, v); }
 static void pushTankBottom(float v){ pushSample(previous.bot, v); }
+static void pushAnkerPower(float v){ anker_power_hist.push(v); }
+static void pushAnkerSoc(float v)  { anker_soc_hist.push(v); }
 
 static void onPlug1(const uint8_t* data, unsigned int len, float value) {
    latest_data.plug_heater = (int)value;
@@ -709,8 +799,8 @@ static const Binding BINDINGS[] = {
    {"roost/immersion_time",         &latest_data.hotwater_minutes,        60, NULL,            NULL},   // hours -> minutes
    {"roost/immersion_energy_today", &latest_data.hotwater_kwh,            1,  NULL,            NULL},
    {"roost/immersion_power",        NULL,                                 1,  NULL,            onImmersionPower},
-   {"anker/battery/curr/battery_power",&latest_data.anker_power,          1,  NULL,            NULL},
-   {"anker/battery/curr/battery_soc",  &latest_data.anker_energy,         1,  NULL,            NULL},
+   {"anker/battery/curr/battery_power",&latest_data.anker_power,          1,  pushAnkerPower,  NULL},
+   {"anker/battery/curr/battery_soc",  &latest_data.anker_energy,         1,  pushAnkerSoc,    NULL},
    {"roost/energy",                 &latest_data.energy,                  1,  NULL,            NULL},
    {"roost/ashp_power",             &latest_data.ashp_power,              1,  NULL,            NULL},
    {"roost/ashp_energy_today",      &latest_data.ashp_energy_today,       1,  NULL,            NULL},
