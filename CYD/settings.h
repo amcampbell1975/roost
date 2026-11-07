@@ -14,6 +14,9 @@ const double CHICKEN_FLASH_TIME    = 30;
 const double DISPLAY_AFTER_SUNRISE =  5;
 const double DISPLAY_AFTER_SUNSET  =  90;
 
+// Tasmota energy monitor: JSON payload with a "PowerMonitor" field (W). Change the device id to match yours.
+#define TASMOTA_POWER_TOPIC "tele/tasmota_FE4918/SENSOR"
+
 // MQTT Server
 const char* mqtt_server = "192.168.1.250";
 

@@ -24,6 +24,8 @@
 #include "src/generated/icon_plug.h"   
 #include "src/generated/icon_sun.h"    
 #include "src/generated/icon_battery.h"
+#include "src/generated/icon_anker.h"
+
 // #include "src/generated/icon_" //
 
 
@@ -79,6 +81,7 @@ struct LatestData {
    float solaredge_power = 0;
    float anker_power = 0;
    float anker_energy = 0;
+   float tasmota_power = 0;   // PowerMonitor from the Tasmota energy monitor (W)
 };
 static LatestData latest_data;
 
@@ -321,8 +324,49 @@ static void HotWater() {
 static void Dial(float value) {
    int int_value = int(value + 0.5f);
    const int angle = mapClip(int_value, -3000, 3000, -135, 135);
+   
+   sprite_power.setTextColor(TFT_WHITE, TFT_BLACK);
 
    sprite_power.fillScreen(TFT_BLACK);
+   {
+      char buf[24];
+      sprite_power.pushImage(5,  5,  icon_grid_width, icon_grid_height, icon_grid_img);
+      char import_export[3];
+      if (latest_data.power > 0) {
+         strcpy(import_export, "in");
+      } else {
+         strcpy(import_export, "ex");
+      }  
+      snprintf(buf, sizeof buf, "%s %.2f KW", import_export, latest_data.power/1000.0f);
+      sprite_power.drawString(buf, 50, 5, 2);
+   }
+   {
+      char buf[24];
+      sprite_power.pushImage(5, 45, icon_sun_width, icon_sun_height, icon_sun_img);
+      snprintf(buf, sizeof buf, "%.2f KW", latest_data.solaredge_power / 1000.0f);
+      sprite_power.drawString(buf, 50, 45 , 2);
+   } 
+   {
+      char buf[24];
+      sprite_power.pushImage(5, 80  , icon_anker_width, icon_anker_height, icon_anker_img);
+      char import_export[20];
+      if (latest_data.power > 0) {
+         strcpy(import_export, "discharge");
+      } else {
+         strcpy(import_export, "charge");
+      }  
+      snprintf(buf, sizeof buf, "%s %.2f KW", import_export, latest_data.anker_power / 1000.0f);
+      sprite_power.drawString(buf, 50, 80, 2);
+   } 
+
+
+   
+   sprite_power.pushSprite(POWER_X, POWER_Y, TFT_TRANSPARENT);
+   return;
+   
+   // else
+   //    sprite_power.pushImage(AS - 8, AS - 8, icon_sun_width, icon_sun_height, icon_sun_img);
+   
 
    // Border
    const int BORDER = 4;
@@ -608,20 +652,37 @@ static void onImmersionPower(const uint8_t* data, unsigned int len, float value)
    latest_data.immersion_on = value > 0 ? 1 : 0;
    pushImmersion(value);
 }
-static void onSolarEdge(const uint8_t* data, unsigned int len, float value) {
+// Read one numeric field out of a JSON payload. Logs and returns false if the payload is not
+// valid JSON or the field is missing, so a bad message never overwrites good data with 0.
+static bool jsonNumber(const uint8_t* data, unsigned int len, const char* key, const char* who, float& out) {
    JsonDocument doc;
    const DeserializationError err = deserializeJson(doc, reinterpret_cast<const char*>(data), len);
    if (err) {
-      Serial.printf("solaredge: bad JSON (%s)\n", err.c_str());
-      return;
+      Serial.printf("%s: bad JSON (%s)\n", who, err.c_str());
+      return false;
    }
-   const JsonVariant watts = doc["watts"];
-   if (watts.isNull()) {
-      Serial.println("solaredge: no 'watts' field");
-      return;
+   const JsonVariant field = doc[key];
+   if (field.isNull()) {
+      Serial.printf("%s: no '%s' field\n", who, key);
+      return false;
    }
-   latest_data.solaredge_power = watts.as<float>();
+   out = field.as<float>();
+   return true;
+}
+
+static void onSolarEdge(const uint8_t* data, unsigned int len, float value) {
+   float watts;
+   if (!jsonNumber(data, len, "watts", "solaredge", watts)) return;
+   latest_data.solaredge_power = watts;
    pushSolar(latest_data.solaredge_power);
+}
+
+// Tasmota energy monitor, e.g. {"Time":"...","PowerMonitor": 2807.96 ,"Vrms": 250.27 ,"ApparentPower": 2778.74 }
+static void onTasmotaSensor(const uint8_t* data, unsigned int len, float value) {
+   float watts;
+   if (!jsonNumber(data, len, "PowerMonitor", "tasmota", watts)) return;
+   latest_data.tasmota_power = watts;
+   LOGF("tasmota PowerMonitor=%.1f W\n", watts);
 }
 
 // One row per subscribed topic. Simple numeric topics just name the field to store into
@@ -659,6 +720,7 @@ static const Binding BINDINGS[] = {
    {"midea/fan_speed",              &latest_data.midea_fan_speed,         1,  NULL,            NULL},
    {"midea/target_temperature",     &latest_data.midea_target_temperature,1,  NULL,            NULL},
    {"solaredge",                    NULL,                                 1,  NULL,            onSolarEdge},
+   {TASMOTA_POWER_TOPIC,            NULL,                                 1,  NULL,            onTasmotaSensor},
 };
 static const int BINDING_COUNT = sizeof(BINDINGS) / sizeof(BINDINGS[0]);
 
