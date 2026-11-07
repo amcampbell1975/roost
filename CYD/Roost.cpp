@@ -363,7 +363,7 @@ static void Dial(float value) {
    } 
    {
       char buf[24];
-      sprite_power.pushImage(ANKER_ICON_X, ANKER_ICON_Y, icon_anker_width, icon_anker_height, icon_anker_img);
+      sprite_power.pushImage(5, 80  , icon_anker_width, icon_anker_height, icon_anker_img);
       char import_export[20];
       if (latest_data.power > 0) {
          strcpy(import_export, "discharge");
@@ -371,7 +371,7 @@ static void Dial(float value) {
          strcpy(import_export, "charge");
       }  
       snprintf(buf, sizeof buf, "%s %.2f KW", import_export, latest_data.anker_power / 1000.0f);
-      sprite_power.drawString(buf, 50, ANKER_ICON_Y, 2);
+      sprite_power.drawString(buf, 50, 80, 2);
    } 
 
 
@@ -578,11 +578,10 @@ static void AnkerGraph() {
    tft.setTextColor(TFT_CYAN,   TFT_BLACK, false); tft.drawString("Level",     200, 3, 2);
 }
 
-// True if a touch is on the Anker row of the power dial (icon plus its text).
-static bool touchedAnkerRow(int x, int y) {
-   return x >= POWER_X && x < POWER_X + POWER_W &&
-          y >= POWER_Y + ANKER_ICON_Y - ANKER_TOUCH_PAD &&
-          y <= POWER_Y + ANKER_ICON_Y + icon_anker_height + ANKER_TOUCH_PAD;
+// True if a touch is on the battery widget (icon, power/energy text and level bar).
+static bool touchedBattery(int x, int y) {
+   return x >= BATTERY_X && x < BATTERY_X + BATTERY_W &&
+          y >= BATTERY_Y && y < BATTERY_Y + BATTERY_H;
 }
 
 static void drawHM(const char* label, double minutes, int y) {
@@ -704,7 +703,7 @@ static void handleTouch(uint32_t now) {
       MideaHotWaterTemperature();
       tft.fillScreen(TFT_BLACK);
       drawDashboard();
-   } else if (touchedAnkerRow(x, y)) {
+   } else if (touchedBattery(x, y)) {
       AnkerGraph();
    } else if (y < 50) {
       InfoScreen();

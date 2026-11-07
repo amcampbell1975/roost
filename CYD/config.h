@@ -26,12 +26,6 @@
 #define TANK_Y    20
 #define TANK_W    60
 #define TANK_H    220
-// Anker battery row inside the power dial sprite: the icon is drawn here and a touch on the
-// row (icon + text) opens the Anker history graph. Keep the icon clear of the sun icon above it.
-#define ANKER_ICON_X   5
-#define ANKER_ICON_Y   80
-#define ANKER_TOUCH_PAD 3   // extra touch margin above/below the icon (px)
-
 #define ASHP_X    178
 #define ASHP_Y    20
 #define ASHP_W    70
