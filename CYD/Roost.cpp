@@ -546,15 +546,19 @@ static void AnkerGraph() {
          vline(i, 0, GRAPH_HEIGHT, TFT_DARKGREY);
    }
 
-   // Power line (consecutive samples joined so steep changes stay connected, never thinner than 2 px)
+   // Power line (consecutive samples joined so steep changes stay connected, never thinner than 2 px).
+   // Colour follows the side of the zero axis each pixel is on: above = green (charging),
+   // below = orange (discharging), on the axis itself = white.
+   const int y0 = mapClip(0, -range, range, GRAPH_HEIGHT, 0);
    int prev_y = -1;
    for (int i = anker_power_hist.first(); i < HISTORY_LEN; i++) {
-      const float p      = anker_power_hist.v[i];
-      const int   y      = mapClip(-p, -range, range, GRAPH_HEIGHT, 0);     // charging (p < 0) plots above zero
-      const uint16_t col = p < 0 ? TFT_GREEN : TFT_ORANGE;
-      const int   from   = prev_y < 0 ? y : (y < prev_y ? y : prev_y);
-      const int   h      = (prev_y < 0 ? 0 : (y < prev_y ? prev_y - y : y - prev_y)) + 2;
-      vline(i, from, h, col);
+      const int y    = mapClip(-anker_power_hist.v[i], -range, range, GRAPH_HEIGHT, 0);   // charging (p < 0) plots above zero
+      const int from = prev_y < 0 ? y : (y < prev_y ? y : prev_y);
+      const int to   = (prev_y < 0 ? y : (y < prev_y ? prev_y : y)) + 1;                  // inclusive, +1 px thickness
+      for (int r = from; r <= to; r++) {
+         const uint16_t col = r < y0 ? TFT_GREEN : (r > y0 ? TFT_ORANGE : TFT_WHITE);
+         vline(i, r, 1, col);
+      }
       prev_y = y;
    }
 
