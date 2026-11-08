@@ -273,11 +273,12 @@ static void Battery_Draw(float battery_power, float battery_energy) {
    {
       static const uint16_t colour_bar[5] = {TFT_RED, TFT_ORANGE, TFT_YELLOW, TFT_GREENYELLOW,  TFT_GREEN};
       const float MAX_ENERGY = 5.00;
-      const int width = mapClip(battery_energy, 0, MAX_ENERGY, 0, 40);
+      const int BAR_SIZE = 36;
+      const int width = mapClip(battery_energy, 0, MAX_ENERGY, 0, BAR_SIZE);
       const int colour_index = constrain(mapClip(battery_energy, 0, MAX_ENERGY, 0, 5), 0, 4);
       
-      sprite_battery.fillRect(10, 25, 40,   10, TFT_LIGHTGREY);
-      sprite_battery.fillRect(10, 25, width,10, colour_bar[colour_index]);
+      sprite_battery.fillRect(13, 25, BAR_SIZE,   14, TFT_LIGHTGREY);
+      sprite_battery.fillRect(13, 25, width,      14, colour_bar[colour_index]);
    }
 
    sprite_battery.pushSprite(BATTERY_X, BATTERY_Y, TFT_TRANSPARENT);
