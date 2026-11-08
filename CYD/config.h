@@ -9,6 +9,8 @@
 // Show the (currently hidden) energy bar. It shares screen space with the Tado grid.
 #define SHOW_ENERGY_BAR 0
 
+#define MIDEA_POWER_SCALE 1.2f // fudge factor to convert Midea current/voltage to actual power (watts)
+
 /////////////////////////////////////
 // Screen geometry
 /////////////////////////////////////

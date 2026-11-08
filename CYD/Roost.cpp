@@ -240,7 +240,7 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
       //    sprite_ashp.fillCircle(21, 22, 15, colour_bar[colour_index]);
 
       const float MAX_ENERGY = 1.5;
-      const float power_estimate = (latest_data.midea_current*latest_data.midea_voltage)/1000.0f; 
+      const float power_estimate = (latest_data.midea_current*latest_data.midea_voltage * MIDEA_POWER_SCALE )/1000.0f ; 
       const int height = mapClip(power_estimate, 0, MAX_ENERGY, 0, 30);
       const int colour_index = constrain(mapClip(power_estimate, 0, MAX_ENERGY, 0, 5), 0, 4);
       sprite_ashp.fillRect(45, 37 - height, 9, height, colour_bar[colour_index]);
@@ -427,7 +427,7 @@ static void drawHouseOverview() {
       char buf[24];
       sprite_power.pushImage(5, 110, icon_sun_width, icon_sun_height, icon_sun_img);
       snprintf(buf, sizeof buf, "%.2f KW", latest_data.solaredge_power / 1000.0f);
-      sprite_power.drawString(buf, 5, 110+28 , 2);
+      sprite_power.drawString(buf, 5, 110+30 , 2);
    } 
    
    const int HOUSE_X = 80;
@@ -451,7 +451,7 @@ static void drawHouseOverview() {
       drawArrowLine(sprite_power, 35      ,120   , HOUSE_X-2,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    }
    {
-      const float p = latest_data.ashp_power;
+      const float p = (latest_data.midea_current*latest_data.midea_voltage *MIDEA_POWER_SCALE);///1000.0f; 
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
       drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16-8, 159    ,40     ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    }
