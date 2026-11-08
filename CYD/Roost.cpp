@@ -514,9 +514,10 @@ static void HotGraph() {
    tft.drawFastHLine(0, GRAPH_HEIGHT + 1, SCREEN_W, TFT_WHITE);
 }
 
-// History of the Anker battery. Power is drawn as bars either side of a zero line (orange above =
-// discharging, green below = charging) auto-scaled in 500 W steps; the charge level is a cyan line
-// on a 0-100 % scale. The zero line therefore lines up with 50 %.
+// History of the Anker battery. Power is a line either side of a zero line: above it the battery
+// is charging (green), below it discharging (orange), auto-scaled in 500 W steps. The charge level
+// is a bar graph on a 0-100 % scale behind it, so the zero line lines up with 50 %.
+// Note: anker_power is negative while charging, so it is negated for plotting.
 static void AnkerGraph() {
    char label[16];
 
@@ -526,10 +527,16 @@ static void AnkerGraph() {
       const float a = fabsf(anker_power_hist.v[i]);
       if (a > peak) peak = a;
    }
-   const float range  = peak <= 500 ? 500 : ceilf(peak / 500) * 500;   // W
-   const int   zero_y = mapClip(0, -range, range, GRAPH_HEIGHT, 0);
+   const float range = peak <= 500 ? 500 : ceilf(peak / 500) * 500;   // W
 
-   // Grid: -range, -range/2, 0, +range/2, +range, and a vertical line every 60 samples
+   // Charge level bars, drawn first so everything else stays visible on top of them
+   for (int i = anker_soc_hist.first(); i < HISTORY_LEN; i++) {
+      const int y = mapClip(anker_soc_hist.v[i], 0, 100, GRAPH_HEIGHT, 0);
+      vline(i, y, GRAPH_HEIGHT - y, TFT_DARKCYAN);
+   }
+
+   // Grid: +range (charging), +range/2, 0, -range/2, -range (discharging), and a vertical line
+   // every 60 samples
    for (int k = -2; k <= 2; k++) {
       const int y = mapClip(range * k / 2, -range, range, GRAPH_HEIGHT, 0);
       tft.drawFastHLine(0, y, SCREEN_W, k == 0 ? TFT_WHITE : TFT_DARKGREY);
@@ -539,25 +546,15 @@ static void AnkerGraph() {
          vline(i, 0, GRAPH_HEIGHT, TFT_DARKGREY);
    }
 
-   // Power bars
-   for (int i = anker_power_hist.first(); i < HISTORY_LEN; i++) {
-      const float p = anker_power_hist.v[i];
-      const int   y = mapClip(p, -range, range, GRAPH_HEIGHT, 0);
-      if (p > 0)      vline(i, y, zero_y - y, TFT_ORANGE);        // discharging: above the zero line
-      else if (p < 0) vline(i, zero_y, y - zero_y, TFT_GREEN);    // charging: below it
-   }
-
-   // Charge level line (consecutive samples joined so steep changes stay connected)
+   // Power line (consecutive samples joined so steep changes stay connected, never thinner than 2 px)
    int prev_y = -1;
-   for (int i = anker_soc_hist.first(); i < HISTORY_LEN; i++) {
-      const int y = mapClip(anker_soc_hist.v[i], 0, 100, GRAPH_HEIGHT, 0);
-      if (prev_y < 0) {
-         tft.drawPixel(i, y, TFT_CYAN);
-      } else {
-         const int top = y < prev_y ? y : prev_y;
-         const int h   = (y < prev_y ? prev_y - y : y - prev_y) + 1;
-         vline(i, top, h, TFT_CYAN);
-      }
+   for (int i = anker_power_hist.first(); i < HISTORY_LEN; i++) {
+      const float p      = anker_power_hist.v[i];
+      const int   y      = mapClip(-p, -range, range, GRAPH_HEIGHT, 0);     // charging (p < 0) plots above zero
+      const uint16_t col = p < 0 ? TFT_GREEN : TFT_ORANGE;
+      const int   from   = prev_y < 0 ? y : (y < prev_y ? y : prev_y);
+      const int   h      = (prev_y < 0 ? 0 : (y < prev_y ? prev_y - y : y - prev_y)) + 2;
+      vline(i, from, h, col);
       prev_y = y;
    }
 
@@ -566,7 +563,7 @@ static void AnkerGraph() {
       const int y  = mapClip(range * k / 2, -range, range, GRAPH_HEIGHT, 0);
       const int ty = k == 2 ? y + 2 : y - 16;     // keep the text inside the graph
       tft.setTextColor(TFT_WHITE, TFT_BLACK, false);
-      snprintf(label, sizeof label, "%.2fkW", range * k / 2000.0f);
+      snprintf(label, sizeof label, "%+.2fkW", range * k / 2000.0f);       // + = charging
       tft.drawString(label, 2, ty, 2);
       tft.setTextColor(TFT_CYAN, TFT_BLACK, false);
       snprintf(label, sizeof label, "%d%%", (k + 2) * 25);
