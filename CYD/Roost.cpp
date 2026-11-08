@@ -343,13 +343,13 @@ uint16_t PowerToColour(float p_watts) {
    } else if(p_watts < 500) {
       return TFT_GREEN;
    } else if(p_watts < 1000) {
-      return TFT_YELLOW;
+      return TFT_GREENYELLOW;
    } else if(p_watts < 1500) {
-      return TFT_ORANGE;
+      return TFT_YELLOW;
    } else if(p_watts < 2000) {
-      return TFT_RED;
+      return TFT_ORANGE;
    } 
-   return TFT_BROWN; // Error should never occur, but if it does, make it obvious with a brown arrow.
+   return TFT_RED; //greater than 2000W 
 }
 uint16_t PowerToSize(float p_watts) {
    p_watts = fabsf(p_watts);
@@ -366,7 +366,10 @@ uint16_t PowerToSize(float p_watts) {
    }
 }
 
-void drawArrowLine(TFT_eSPI &tft, int32_t ax, int32_t ay, int32_t bx, int32_t by, int32_t width, uint16_t color) {
+#include <TFT_eSPI.h>
+#include <cmath>
+
+void drawArrowLine(TFT_eSPI &tft, int32_t ax, int32_t ay, int32_t bx, int32_t by, int32_t width, uint16_t color, bool enable_arrow_head) {
     // Calculate direction vector from start (A) to end (B)
     float dx = (float)(bx - ax);
     float dy = (float)(by - ay);
@@ -382,7 +385,7 @@ void drawArrowLine(TFT_eSPI &tft, int32_t ax, int32_t ay, int32_t bx, int32_t by
     float px = -uy;
     float py = ux;
 
-    // 1. Draw the wide line (supports widths 1 to 5 cleanly without anti-aliasing artifacts)
+    // 1. Draw the wide line (supports widths 1 to 5 cleanly)
     for (int i = 0; i < width; ++i) {
         float offset = i - (width - 1) / 2.0f;
         int32_t ox = (int32_t)round(px * offset);
@@ -390,41 +393,34 @@ void drawArrowLine(TFT_eSPI &tft, int32_t ax, int32_t ay, int32_t bx, int32_t by
         tft.drawLine(ax + ox, ay + oy, bx + ox, by + oy, color);
     }
 
-    // 2. Scale arrowhead dimensions dynamically based on line width
-    float arrow_len   = width * 3.5f + 4.0f;   // Length from tip to base
-    float arrow_width = width * 2.0f + 3.0f;   // Half-width spread of the wings
+    // 2. Draw arrowhead only if enabled
+    if (enable_arrow_head) {
+        // Scale arrowhead dimensions dynamically based on line width
+        float arrow_len   = width * 3.5f + 4.0f;   // Length from tip to base
+        float arrow_width = width * 2.0f + 3.0f;   // Half-width spread of the wings
 
-    // Find the base center point of the arrowhead backwards from tip (B)
-    float cx = bx - ux * arrow_len;
-    float cy = by - uy * arrow_len;
+        // Find the base center point of the arrowhead backwards from tip (B)
+        float cx = bx - ux * arrow_len;
+        float cy = by - uy * arrow_len;
 
-    // Calculate the two wing tips of the arrowhead perpendicular to the line
-    int32_t wing1_x = (int32_t)round(cx + px * arrow_width);
-    int32_t wing1_y = (int32_t)round(cy + py * arrow_width);
-    int32_t wing2_x = (int32_t)round(cx - px * arrow_width);
-    int32_t wing2_y = (int32_t)round(cy - py * arrow_width);
+        // Calculate the two wing tips of the arrowhead perpendicular to the line
+        int32_t wing1_x = (int32_t)round(cx + px * arrow_width);
+        int32_t wing1_y = (int32_t)round(cy + py * arrow_width);
+        int32_t wing2_x = (int32_t)round(cx - px * arrow_width);
+        int32_t wing2_y = (int32_t)round(cy - py * arrow_width);
 
-    // 3. Draw the solid filled arrowhead triangle pointing at (bx, by)
-    tft.fillTriangle(bx, by, wing1_x, wing1_y, wing2_x, wing2_y, color);
+        // Draw the solid filled arrowhead triangle pointing at (bx, by)
+        tft.fillTriangle(bx, by, wing1_x, wing1_y, wing2_x, wing2_y, color);
+    }
 }
-
-static void Dial(float value) {
-   int int_value = int(value + 0.5f);
-   const int angle = mapClip(int_value, -3000, 3000, -135, 135);
-   
+static void drawHouseOverview() {
    sprite_power.setTextColor(TFT_WHITE, TFT_BLACK);
 
    sprite_power.fillScreen(TFT_BLACK);
    {
       char buf[24];
       sprite_power.pushImage(5,  28,  icon_grid_width, icon_grid_height, icon_grid_img);
-      char import_export[3];
-      if (latest_data.power > 0) {
-         strcpy(import_export, "in");
-      } else {
-         strcpy(import_export, "ex");
-      }  
-      snprintf(buf, sizeof buf, "%s %.2f KW", import_export, latest_data.power/1000.0f);
+      snprintf(buf, sizeof buf, "%.2f KW", latest_data.power/1000.0f);
       sprite_power.drawString(buf, 5, 2, 2);
    }
    {
@@ -433,20 +429,6 @@ static void Dial(float value) {
       snprintf(buf, sizeof buf, "%.2f KW", latest_data.solaredge_power / 1000.0f);
       sprite_power.drawString(buf, 5, 110+28 , 2);
    } 
-   if(0){
-      char buf[24];
-      sprite_power.pushImage(5, 80  , icon_anker_width, icon_anker_height, icon_anker_img);
-      char import_export[20];
-      if (latest_data.power > 0) {
-         strcpy(import_export, "discharge");
-      } else {
-         strcpy(import_export, "charge");
-      }  
-      snprintf(buf, sizeof buf, "%s %.2f KW", import_export, latest_data.anker_power / 1000.0f);
-      sprite_power.drawString(buf, 50, 80, 2);
-   } 
-
-
    
    const int HOUSE_X = 80;
    const int HOUSE_Y = 60;
@@ -455,73 +437,43 @@ static void Dial(float value) {
    if (latest_data.power > 0) {
       //Import
       const float p = latest_data.power;
-      drawArrowLine(sprite_power,35      ,35    , HOUSE_X-2,HOUSE_Y+16-8,  PowerToSize(p), PowerToColour(p));
+      const bool enable_arrow_head = p>100; // Only show arrow head if power is significant
+      drawArrowLine(sprite_power,35      ,35    , HOUSE_X-2,HOUSE_Y+16-8,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    } else {
       //Export
       const float p = latest_data.power;
-      drawArrowLine(sprite_power,HOUSE_X-2,HOUSE_Y+16-8, 35      ,35    ,  PowerToSize(p), PowerToColour(p));
+      const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
+      drawArrowLine(sprite_power,HOUSE_X-2,HOUSE_Y+16-8, 35      ,35    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    }
    {
       const float p = latest_data.solaredge_power;
-      drawArrowLine(sprite_power, 35      ,120   , HOUSE_X-2,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p));
+      const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
+      drawArrowLine(sprite_power, 35      ,120   , HOUSE_X-2,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    }
    {
       const float p = latest_data.ashp_power;
-      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16-8, 159    ,40     ,  PowerToSize(p), PowerToColour(p));
+      const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
+      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16-8, 159    ,40     ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    }
    if( latest_data.anker_power < 0) {
       //Charge
       const float p = latest_data.anker_power;
-      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16+8, 159    ,130    ,  PowerToSize(p), PowerToColour(p));
+      const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
+      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16+8, 159    ,130    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    } else {
       //Discharge
       const float p = latest_data.anker_power;
-      drawArrowLine(sprite_power, 159    ,130    , HOUSE_X+32,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p));
+      const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
+      drawArrowLine(sprite_power, 159    ,130    , HOUSE_X+32,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    }
-
 
    sprite_power.pushSprite(POWER_X, POWER_Y, TFT_TRANSPARENT);
    return;
    
-   // else
-   //    sprite_power.pushImage(AS - 8, AS - 8, icon_sun_width, icon_sun_height, icon_sun_img);
-   
-
-   // Border
-   const int BORDER = 4;
-   const int AS = 70; // Arc Size
-   sprite_power.drawArc(80, 80, AS + BORDER, 30 - BORDER, 45, 315, TFT_DARKGREY, TFT_DARKGREY, true);
-
-   if (angle > 0) {
-      sprite_power.drawArc(80, 80, AS, 30, 180,       180 + 30,  TFT_GREENYELLOW, TFT_GREENYELLOW, true);
-      sprite_power.drawArc(80, 80, AS, 30, 180 + 30,  180 + 60,  TFT_YELLOW,      TFT_YELLOW,      true);
-      sprite_power.drawArc(80, 80, AS, 30, 180 + 60,  180 + 90,  TFT_ORANGE,      TFT_ORANGE,      true);
-      sprite_power.drawArc(80, 80, AS, 30, 180 + 90,  180 + 135, TFT_RED,         TFT_RED,         true);
-      sprite_power.drawArc(80, 80, AS, 30, angle + 180, 180 + 135, TFT_DARKGREY,  TFT_DARKGREY,    true);
-   } else {
-      sprite_power.drawArc(80, 80, AS, 30, 180 - 30,  180,       TFT_GREEN,  TFT_GREEN,  true);
-      sprite_power.drawArc(80, 80, AS, 30, 180 - 60,  180 - 30,  TFT_CYAN,   TFT_CYAN,   true);
-      sprite_power.drawArc(80, 80, AS, 30, 180 - 90,  180 - 60,  TFT_BLUE,   TFT_BLUE,   true);
-      sprite_power.drawArc(80, 80, AS, 30, 180 - 135, 180 - 90,  TFT_PURPLE, TFT_PURPLE, true);
-      sprite_power.drawArc(80, 80, AS, 30, 45, angle + 180,      TFT_DARKGREY, TFT_DARKGREY, true);
-   }
-   if (value > 0)
-      sprite_power.pushImage(AS - 8, AS - 8, icon_grid_width, icon_grid_height, icon_grid_img);
-   else
-      sprite_power.pushImage(AS - 8, AS - 8, icon_sun_width, icon_sun_height, icon_sun_img);
-
-   int_value = abs((int_value / 10) * 10);
-   char buf[24];
-   sprite_power.setTextColor(TFT_WHITE, TFT_BLACK);
-   sprite_power.drawNumber(int_value, 50, 120, 4);
-   snprintf(buf, sizeof buf, "%.2f KW", latest_data.solaredge_power / 1000.0f);
-   sprite_power.drawString(buf, 50, 20, 2);
-
-   sprite_power.pushSprite(POWER_X, POWER_Y, TFT_TRANSPARENT);
 }
 
 static void drawDashboard() {
-   Dial(latest_data.power);
+   drawHouseOverview();
    HotWater();
 #if SHOW_ENERGY_BAR
    Energy(latest_data.energy);
