@@ -353,16 +353,20 @@ uint16_t PowerToColour(float p_watts) {
 }
 uint16_t PowerToSize(float p_watts) {
    p_watts = fabsf(p_watts);
-   if(p_watts< 500) {
+   if(p_watts< 250) {
       return 1;
-   } else if(p_watts < 1000) {
+   } else if(p_watts < 400) {
       return 2;
+   } else if(p_watts < 800) {
+      return 3;
    } else if(p_watts < 1500) {
-      return 3;
-   } else if(p_watts < 2000) {
-      return 3;
-   } else {
       return 4;
+   } else if(p_watts < 2000) {
+      return 5;
+   } else if(p_watts < 3000) {
+      return 6;
+   } else {
+      return 7;
    }
 }
 
