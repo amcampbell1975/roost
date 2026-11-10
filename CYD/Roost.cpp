@@ -112,6 +112,12 @@ struct Series {
 };
 static Series anker_power_hist;    // W, + = discharging, - = charging
 static Series anker_soc_hist;      // charge level, %
+static Series ashp_power_hist;     // heat pump electrical power, kW
+
+// Heat pump power estimated from the Midea current and voltage.
+static float ashpPowerKw() {
+   return (latest_data.midea_current * latest_data.midea_voltage * MIDEA_POWER_SCALE) / 1000.0f;
+}
 
 #define WATER_COLOURS 20
 static uint16_t water_temp_colour_scale[WATER_COLOURS];
@@ -240,7 +246,7 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
       //    sprite_ashp.fillCircle(21, 22, 15, colour_bar[colour_index]);
 
       const float MAX_ENERGY = 1.5;
-      const float power_estimate = (latest_data.midea_current*latest_data.midea_voltage * MIDEA_POWER_SCALE )/1000.0f ; 
+      const float power_estimate = ashpPowerKw();
       const int height = mapClip(power_estimate, 0, MAX_ENERGY, 0, 30);
       const int colour_index = constrain(mapClip(power_estimate, 0, MAX_ENERGY, 0, 5), 0, 4);
       sprite_ashp.fillRect(45, 37 - height, 9, height, colour_bar[colour_index]);
@@ -704,37 +710,80 @@ static bool readTouch(int& x, int& y) {
    return true;
 }
 
-// Heat pump hot-water set-point menu: OFF / 40 C / 50 C.
-static void MideaHotWaterTemperature() {
-   const int BOX_SIZE = 80;
-   const int BOX_GAP  = 20;
-   const int BOX_Y    = 100;
-   struct Option { const char* label; const char* payload; };
-   static const Option options[3] = {{"OFF", "0"}, {"40 C", "40"}, {"50 C", "50"}};
-   #define BOX_X(i) (((i) + 1) * BOX_GAP + (i) * BOX_SIZE)
+// Heat pump view, opened by touching the heat pump icon: hot-water set-point buttons (OFF / 40 C /
+// 50 C) down the left, and a history of the heat pump power on a fixed 0-3 kW scale beside them.
+// Touching the graph closes the view; so does a set-point button (after publishing it).
+static void AshpGraph(int graph_x) {
+   const float KW_MAX = 3.0f;
+   const int   GW     = SCREEN_W - graph_x;    // graph width: the newest GW samples are shown
+   char label[16];
 
-   tft.fillScreen(TFT_BLACK);
-   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-   for (int i = 0; i < 3; i++) {
-      tft.drawRect(BOX_X(i), BOX_Y, BOX_SIZE, BOX_SIZE, TFT_DARKGREY);
-      tft.drawString(options[i].label, BOX_X(i) + 10, BOX_Y, 2);
+   // Grid every 0.5 kW, labelled every 1 kW; vertical line every 60 samples
+   for (int k = 0; k <= 6; k++) {
+      const float kw = k * 0.5f;
+      const int   y  = mapClip(kw, 0, KW_MAX, GRAPH_HEIGHT, 0);
+      tft.drawFastHLine(graph_x, y, GW, k == 0 ? TFT_WHITE : TFT_DARKGREY);
+   }
+   for (int c = 0; c < GW; c++) {
+      if ((GW - 1 - c) % 60 == 0)
+         vline(graph_x + c, 0, GRAPH_HEIGHT, TFT_DARKGREY);
    }
 
-   // The touch that opened this menu is probably still down: wait for release first so it
+   // One bar per sample, coloured by power: 0-0.75 kW, 0.75-1.5, 1.5-2.25, above
+   static const uint16_t colours[4] = {TFT_GREENYELLOW, TFT_YELLOW, TFT_ORANGE, TFT_RED};
+   for (int c = 0; c < GW; c++) {
+      const int i = HISTORY_LEN - GW + c;
+      if (i < ashp_power_hist.first()) continue;               // not received yet
+      const float kw = ashp_power_hist.v[i];
+      const int   y  = mapClip(kw, 0, KW_MAX, GRAPH_HEIGHT, 0);
+      vline(graph_x + c, y, GRAPH_HEIGHT - y, colours[constrain((int)(kw / 0.75f), 0, 3)]);
+   }
+
+   // Labels last so they stay readable
+   tft.setTextColor(TFT_WHITE, TFT_BLACK, false);
+   for (int k = 0; k <= 3; k++) {
+      const int y = mapClip((float)k, 0, KW_MAX, GRAPH_HEIGHT, 0);
+      snprintf(label, sizeof label, "%d kW", k);
+      tft.drawString(label, graph_x + 2, k == 3 ? y + 2 : y - 16, 2);
+   }
+   snprintf(label, sizeof label, "Now %.2f kW", ashpPowerKw());
+   tft.drawString(label, graph_x + 60, 3, 2);
+}
+
+static void AshpView() {
+   const int GRAPH_X = 70;                      // graph starts here; buttons are in 0..GRAPH_X-1
+   const int BOX_X   = 4;
+   const int BOX_W   = 62;
+   const int BOX_H   = 70;
+   const int BOX_GAP = 6;
+   struct Option { const char* label; const char* payload; float target; };
+   static const Option options[3] = {{"OFF", "0", MIDEA_OFF_TARGET_TEMP}, {"40 C", "40", 40}, {"50 C", "50", 50}};
+   auto boxY = [&](int i) { return BOX_GAP + i * (BOX_H + BOX_GAP); };
+
+   tft.fillScreen(TFT_BLACK);
+   AshpGraph(GRAPH_X);
+   tft.setTextColor(TFT_WHITE, TFT_BLACK);
+   for (int i = 0; i < 3; i++) {
+      const bool active = fabsf(latest_data.midea_target_temperature - options[i].target) < 0.5f;
+      tft.drawRect(BOX_X, boxY(i), BOX_W, BOX_H, active ? TFT_GREEN : TFT_DARKGREY);
+      tft.drawString(options[i].label, BOX_X + 14, boxY(i) + BOX_H / 2 - 8, 2);
+   }
+
+   // The touch that opened this view is probably still down: wait for release first so it
    // cannot select an option by itself.
    const uint32_t release_deadline = millis() + 1000;
    while (ts.touched() && (int32_t)(millis() - release_deadline) < 0) delay(10);
 
-   const uint32_t deadline = millis() + MIDEA_MENU_TIMEOUT_MS;
+   const uint32_t deadline = millis() + ASHP_VIEW_TIMEOUT_MS;
    while ((int32_t)(millis() - deadline) < 0) {
       delay(1);
       client.loop();
       int x, y;
       if (!readTouch(x, y)) continue;
-      if (y <= BOX_Y || y >= BOX_Y + BOX_SIZE) continue;
+      if (x >= GRAPH_X) return;                 // touch on the graph: close
       for (int i = 0; i < 3; i++) {
-         if (x > BOX_X(i) && x < BOX_X(i) + BOX_SIZE) {
-            tft.drawRect(BOX_X(i), BOX_Y, BOX_SIZE, BOX_SIZE, TFT_WHITE);
+         if (x >= BOX_X && x < BOX_X + BOX_W && y >= boxY(i) && y < boxY(i) + BOX_H) {
+            tft.drawRect(BOX_X, boxY(i), BOX_W, BOX_H, TFT_WHITE);
             client.publish("midea/set_temperature", options[i].payload);
             delay(500);
             return;
@@ -762,7 +811,7 @@ static void handleTouch(uint32_t now) {
    tft.fillScreen(TFT_BLACK);
 
    if (x > ASHP_X && x < ASHP_X + ASHP_W && y > ASHP_Y && y < ASHP_Y + ASHP_H) {
-      MideaHotWaterTemperature();
+      AshpView();
       tft.fillScreen(TFT_BLACK);
       drawDashboard();
    } else if (touchedBattery(x, y)) {
@@ -794,6 +843,7 @@ static void pushTankLower(float v) { pushSample(previous.low, v); }
 static void pushTankBottom(float v){ pushSample(previous.bot, v); }
 static void pushAnkerPower(float v){ anker_power_hist.push(v); }
 static void pushAnkerSoc(float v)  { anker_soc_hist.push(v); }
+static void pushAshp(float)        { ashp_power_hist.push(ashpPowerKw()); }   // called after midea_current is stored
 
 static void onPlug1(const uint8_t* data, unsigned int len, float value) {
    latest_data.plug_heater = (int)value;
@@ -865,7 +915,7 @@ static const Binding BINDINGS[] = {
    {"roost/energy",                 &latest_data.energy,                  1,  NULL,            NULL},
    {"roost/ashp_power",             &latest_data.ashp_power,              1,  NULL,            NULL},
    {"roost/ashp_energy_today",      &latest_data.ashp_energy_today,       1,  NULL,            NULL},
-   {"midea/current",                &latest_data.midea_current,           1,  NULL,            NULL},
+   {"midea/current",                &latest_data.midea_current,           1,  pushAshp,        NULL},
    {"midea/voltage",                &latest_data.midea_voltage,           1,  NULL,            NULL},
    {"midea/power_mode",             &latest_data.midea_power_mode,        1,  NULL,            NULL},
    {"midea/fan_speed",              &latest_data.midea_fan_speed,         1,  NULL,            NULL},

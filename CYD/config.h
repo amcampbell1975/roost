@@ -79,7 +79,7 @@
 #define TOUCH_HOLD_MS           20000   // keep a touched screen up this long
 #define TOUCH_RELEASE_MS          100   // debounce: finger must be up this long
 #define CHICKEN_FLASH_PERIOD_MS  2000   // backlight toggle period at chicken bedtime
-#define MIDEA_MENU_TIMEOUT_MS    2000
+#define ASHP_VIEW_TIMEOUT_MS    20000   // heat pump graph / set-point view closes itself after this
 #define WIFI_CONNECT_TIMEOUT_MS 30000
 #define MQTT_RETRY_MS            5000
 
