@@ -21,6 +21,10 @@
 #include "src/generated/icon_ashp.h"   
 #include "src/generated/icon_grid.h"   
 #include "src/generated/icon_heater.h" 
+#include "src/generated/icon_heater1.h" 
+#include "src/generated/icon_heater2.h" 
+#include "src/generated/icon_heater3.h" 
+#include "src/generated/icon_heater4.h" 
 #include "src/generated/icon_plug.h"   
 #include "src/generated/icon_sun.h"    
 #include "src/generated/icon_battery.h"
@@ -41,12 +45,13 @@ static SPIClass mySpi = SPIClass(VSPI);
 static XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);
 
 static TFT_eSPI tft = TFT_eSPI();
-static TFT_eSprite sprite_power  = TFT_eSprite(&tft);
-static TFT_eSprite sprite_ashp   = TFT_eSprite(&tft);
-static TFT_eSprite sprite_tank   = TFT_eSprite(&tft);
-static TFT_eSprite sprite_energy = TFT_eSprite(&tft);
-static TFT_eSprite sprite_tado   = TFT_eSprite(&tft);
-static TFT_eSprite sprite_battery= TFT_eSprite(&tft);
+static TFT_eSprite sprite_power    = TFT_eSprite(&tft);
+static TFT_eSprite sprite_ashp     = TFT_eSprite(&tft);
+static TFT_eSprite sprite_tank     = TFT_eSprite(&tft);
+static TFT_eSprite sprite_energy   = TFT_eSprite(&tft);
+static TFT_eSprite sprite_tado     = TFT_eSprite(&tft);
+static TFT_eSprite sprite_battery  = TFT_eSprite(&tft);
+static TFT_eSprite sprite_immersion= TFT_eSprite(&tft);
 
 // Tado rooms: MQTT topic suffix and the short label drawn on the grid. Order matters
 // (it is the index into the tado_* arrays and the position on the grid).
@@ -252,19 +257,33 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
       sprite_ashp.fillRect(45, 37 - height, 9, height, colour_bar[colour_index]);
 
       snprintf(buf, sizeof buf, "%.1f KW",power_estimate);
-      sprite_ashp.drawString(buf, 0, 30 + 18, 2);
+      sprite_ashp.drawString(buf, 0, 29 + 16, 2);
 
-      //snprintf(buf, sizeof buf, "%.2f KWh", ashp_energy_today);
-      //sprite_ashp.drawString(buf, 0, 45 + 18, 2);
-      // if (latest_data.midea_target_temperature == MIDEA_OFF_TARGET_TEMP) {
-      //    sprite_ashp.drawString("Off", 0, 45 + 18 + 18, 2);
-      // } else {
-      //    snprintf(buf, sizeof buf, "%.2f C", latest_data.midea_target_temperature);
-      //    sprite_ashp.drawString(buf, 0, 45 + 18 + 18, 2);
-      // }
+      //snprintf(buf, sizeof buf, "%.1f C", latest_data.midea_target_temperature);
+      //sprite_ashp.drawString(buf, 0, 29 + 16+ 17 , 2);
    }
    sprite_ashp.pushSprite(ASHP_X, ASHP_Y, TFT_TRANSPARENT);
 }
+
+static void ImmersionDraw(void){
+
+   sprite_immersion.fillScreen(TFT_BLACK);
+   const int r=0; //rand() % 5;
+   if(r==0)
+      sprite_immersion.pushImage(0, 0,icon_heater_width, icon_heater_height, icon_heater_img);
+   else if(r==1)
+      sprite_immersion.pushImage(0, 0,icon_heater1_width, icon_heater1_height, icon_heater1_img);
+   else if(r==2)
+      sprite_immersion.pushImage(0, 0,icon_heater2_width, icon_heater2_height, icon_heater2_img);
+   else if(r==3)
+      sprite_immersion.pushImage(0, 0,icon_heater3_width, icon_heater3_height, icon_heater3_img);
+   else
+      sprite_immersion.pushImage(0, 0,icon_heater4_width, icon_heater4_height, icon_heater4_img);
+
+   sprite_immersion.pushSprite(IMMERSION_X, IMMERSION_Y, TFT_TRANSPARENT);
+}
+
+
 static void Battery_Draw(float battery_power, float battery_energy) {
    LOGF("Battery_Draw: battery_power=%.2f battery_energy=%.2f\n", battery_power, battery_energy);
    sprite_battery.fillScreen(TFT_BLACK);
@@ -466,17 +485,28 @@ static void drawHouseOverview() {
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
       drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16-8, 159    ,40     ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    }
+   const int arrow_end_x = 159;
+   const int arrow_end_y = 105;
    if( latest_data.anker_power < 0) {
       //Charge
       const float p = latest_data.anker_power;
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16+8, 159    ,130    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16+8, arrow_end_x    ,arrow_end_y    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    } else {
       //Discharge
       const float p = latest_data.anker_power;
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power, 159    ,130    , HOUSE_X+32,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power, arrow_end_x    ,arrow_end_y    , HOUSE_X+32,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    }
+   {
+      int arrow_end_x = 159;
+      int arrow_end_y = 150;
+      const float p = (150); 
+      const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
+      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16+8, arrow_end_x    ,arrow_end_y    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+   }
+   
+
 
    sprite_power.pushSprite(POWER_X, POWER_Y, TFT_TRANSPARENT);
    return;
@@ -492,6 +522,7 @@ static void drawDashboard() {
    TadoDraw();
    Ashp_Draw(latest_data.ashp_power, latest_data.ashp_energy_today);
    Battery_Draw(latest_data.anker_power/1000.0, (latest_data.anker_energy/100.0) * 5.0f); // convert to KWh
+   ImmersionDraw();
 }
 
 /////////////////////////////////////
@@ -1113,6 +1144,7 @@ void setup() {
    createSprite(sprite_energy,  ENERGY_W,  ENERGY_H,  "energy");
    createSprite(sprite_tado,    TADO_W,    TADO_H,    "tado");
    createSprite(sprite_battery, BATTERY_W, BATTERY_H, "battery");
+   createSprite(sprite_immersion,IMMERSION_W, IMMERSION_H, "immersion");
 
    // Touch screen
    mySpi.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);

@@ -31,7 +31,7 @@
 #define ASHP_X    178
 #define ASHP_Y    20
 #define ASHP_W    70
-#define ASHP_H    100
+#define ASHP_H    60 
 #define ENERGY_X  0
 #define ENERGY_Y  200
 #define ENERGY_W  160
@@ -41,9 +41,14 @@
 #define TADO_W    160
 #define TADO_H    70
 #define BATTERY_X    178
-#define BATTERY_Y    120
+#define BATTERY_Y    83
 #define BATTERY_W    70
 #define BATTERY_H    80
+#define IMMERSION_W  70  
+#define IMMERSION_X  178  
+#define IMMERSION_Y  181
+#define IMMERSION_W  70  
+#define IMMERSION_H  43  
 
 
 /////////////////////////////////////
