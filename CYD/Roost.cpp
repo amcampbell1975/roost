@@ -280,6 +280,14 @@ static void ImmersionDraw(void){
    else
       sprite_immersion.pushImage(0, 0,icon_heater4_width, icon_heater4_height, icon_heater4_img);
 
+   {
+      char buf[24];
+      sprite_immersion.setTextColor(TFT_WHITE, TFT_BLACK);
+      snprintf(buf, sizeof buf, "%.2f KW", latest_data.immersion_power / 1000.0f);
+      sprite_immersion.drawString(buf, 0, 25, 2);
+      snprintf(buf, sizeof buf, "%.2f KWh", latest_data.hotwater_kwh);
+      sprite_immersion.drawString(buf, 0, 25 + 13, 2);
+   }
    sprite_immersion.pushSprite(IMMERSION_X, IMMERSION_Y, TFT_TRANSPARENT);
 }
 
@@ -350,15 +358,17 @@ static void HotWater() {
          sprite_tank.drawString(buf, 5, y + 6, 4);
       }
    }
-   sprite_tank.setTextColor(TFT_WHITE, TFT_BLACK);
-   snprintf(buf, sizeof buf, "%.2f KW", latest_data.immersion_power / 1000.0f);
-   sprite_tank.drawString(buf, 2, 166, 2);
-   snprintf(buf, sizeof buf, "%.2f KWh", latest_data.hotwater_kwh);
-   sprite_tank.drawString(buf, 2, 166 + 13, 2);
-   sprite_tank.drawRect(0, 0, 60, 41 * 4, TFT_WHITE);
+   
+   // moved to immersion drawing function
+   // sprite_tank.setTextColor(TFT_WHITE, TFT_BLACK);
+   // snprintf(buf, sizeof buf, "%.2f KW", latest_data.immersion_power / 1000.0f);
+   // sprite_tank.drawString(buf, 2, 166, 2);
+   // snprintf(buf, sizeof buf, "%.2f KWh", latest_data.hotwater_kwh);
+   // sprite_tank.drawString(buf, 2, 166 + 13, 2);
+   // sprite_tank.drawRect(0, 0, 60, 41 * 4, TFT_WHITE);
 
-   if (latest_data.plug_heater == 1)
-      sprite_tank.pushImage(15, 70, icon_plug_width, icon_plug_height, icon_plug_img);
+   // if (latest_data.plug_heater == 1)
+   //    sprite_tank.pushImage(15, 70, icon_plug_width, icon_plug_height, icon_plug_img);
 
    sprite_tank.pushSprite(TANK_X, TANK_Y, TFT_TRANSPARENT);
 }
