@@ -295,7 +295,6 @@ static void ImmersionDraw(void){
 
    sprite_immersion.fillScreen(TFT_BLACK);
    float p= latest_data.immersion_power;
-   p=5;
    // p=rand()%(int)(IMMERSION_MAX_POWER_W); // for testing
    drawTintedIcon(sprite_immersion, 0, 0, icon_heater_width, icon_heater_height, icon_heater_img,
                   immersionColour(p));
