@@ -48,7 +48,8 @@
 #define IMMERSION_X  178  
 #define IMMERSION_Y  181
 #define IMMERSION_W  70  
-#define IMMERSION_H  53  
+#define IMMERSION_H  53
+#define IMMERSION_MAX_POWER_W 1200.0f   // immersion element rating: the heater icon turns red at this power
 
 
 /////////////////////////////////////

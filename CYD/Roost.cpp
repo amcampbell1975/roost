@@ -21,10 +21,6 @@
 #include "src/generated/icon_ashp.h"   
 #include "src/generated/icon_grid.h"   
 #include "src/generated/icon_heater.h" 
-#include "src/generated/icon_heater1.h" 
-#include "src/generated/icon_heater2.h" 
-#include "src/generated/icon_heater3.h" 
-#include "src/generated/icon_heater4.h" 
 #include "src/generated/icon_plug.h"   
 #include "src/generated/icon_sun.h"    
 #include "src/generated/icon_battery.h"
@@ -265,25 +261,48 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
    sprite_ashp.pushSprite(ASHP_X, ASHP_Y, TFT_TRANSPARENT);
 }
 
+// Colour of the heater element for a given immersion power: white when off, then green, yellow,
+// orange and red in four equal bands up to IMMERSION_MAX_POWER_W.
+static uint16_t immersionColour(float watts) {
+   static const uint8_t rgb[5][3] = {{ 70,  70,  70}, // Grey
+                                     {145, 255,   0}, // green
+                                     {252, 207,  47}, // yellow
+                                     {255, 138,   0}, // orange
+                                     {255, 0,     0}};// red
+   int band = 0;
+   if (watts > 10)   // also false for NaN
+      band = 1 + constrain((int)(4.0f * watts / IMMERSION_MAX_POWER_W), 0, 3);
+   return tft.color565(rgb[band][0], rgb[band][1], rgb[band][2]);
+}
+
+// Draw a black & white icon with its white replaced by `tint`. The icon's brightness is used as
+// a mask, so the anti-aliased edge pixels blend smoothly; black pixels are left as they are
+// (the sprite is cleared to black first). `img` is the byte-swapped RGB565 data produced by
+// convert_images.py.
+static void drawTintedIcon(TFT_eSprite& spr, int x0, int y0, int w, int h, const uint16_t* img, uint16_t tint) {
+   const int tr = (tint >> 11) & 0x1F, tg = (tint >> 5) & 0x3F, tb = tint & 0x1F;
+   for (int j = 0; j < h; j++) {
+      for (int i = 0; i < w; i++) {
+         const uint16_t p = img[j * w + i];
+         const int level = (uint16_t)((p << 8) | (p >> 8)) & 0x1F;    // blue channel of the true RGB565 value, 0..31
+         if (level == 0) continue;
+         spr.drawPixel(x0 + i, y0 + j, (uint16_t)(((tr * level / 31) << 11) | ((tg * level / 31) << 5) | (tb * level / 31)));
+      }
+   }
+}
+
 static void ImmersionDraw(void){
 
    sprite_immersion.fillScreen(TFT_BLACK);
-   const int r=0; //rand() % 5;
-   if(r==0)
-      sprite_immersion.pushImage(0, 0,icon_heater_width, icon_heater_height, icon_heater_img);
-   else if(r==1)
-      sprite_immersion.pushImage(0, 0,icon_heater1_width, icon_heater1_height, icon_heater1_img);
-   else if(r==2)
-      sprite_immersion.pushImage(0, 0,icon_heater2_width, icon_heater2_height, icon_heater2_img);
-   else if(r==3)
-      sprite_immersion.pushImage(0, 0,icon_heater3_width, icon_heater3_height, icon_heater3_img);
-   else
-      sprite_immersion.pushImage(0, 0,icon_heater4_width, icon_heater4_height, icon_heater4_img);
-
+   float p= latest_data.immersion_power;
+   p=5;
+   // p=rand()%(int)(IMMERSION_MAX_POWER_W); // for testing
+   drawTintedIcon(sprite_immersion, 0, 0, icon_heater_width, icon_heater_height, icon_heater_img,
+                  immersionColour(p));
    {
       char buf[24];
       sprite_immersion.setTextColor(TFT_WHITE, TFT_BLACK);
-      snprintf(buf, sizeof buf, "%.2f KW", latest_data.immersion_power / 1000.0f);
+      snprintf(buf, sizeof buf, "%.2f KW", p / 1000.0f);
       sprite_immersion.drawString(buf, 0, 25, 2);
       snprintf(buf, sizeof buf, "%.2f KWh", latest_data.hotwater_kwh);
       sprite_immersion.drawString(buf, 0, 25 + 13, 2);
