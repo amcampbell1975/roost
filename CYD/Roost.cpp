@@ -705,6 +705,47 @@ static void AnkerGraph() {
    tft.setTextColor(TFT_CYAN,   TFT_BLACK, false); tft.drawString("Level",     200, 3, 2);
 }
 
+// History of the immersion heater power: one bar per sample, scale 0 to IMMERSION_MAX_POWER_W with
+// a grid line at each quarter. Bars use the same colours as the heater icon, so the colour
+// bands line up with the grid lines.
+static void ImmersionGraph() {
+   char label[24];
+
+   for (int k = 0; k <= 4; k++) {
+      const int y = mapClip((float)k, 0, 4, GRAPH_HEIGHT, 0);
+      tft.drawFastHLine(0, y, SCREEN_W, k == 0 ? TFT_WHITE : TFT_DARKGREY);
+   }
+   for (int i = 0; i < HISTORY_LEN; i++) {
+      if ((HISTORY_LEN - 1 - i) % 60 == 0)
+         vline(i, 0, GRAPH_HEIGHT, TFT_DARKGREY);
+   }
+
+   for (int i = 0; i < HISTORY_LEN; i++) {
+      const float p = immersion_powers[i];
+      if (!(p > 10)) continue;                                    // off (also skips NaN)
+      const int y = mapClip(p, 0, IMMERSION_MAX_POWER_W, GRAPH_HEIGHT, 0);
+      vline(i, y, GRAPH_HEIGHT - y, immersionColour(p));
+   }
+
+   // Labels last so they stay readable
+   tft.setTextColor(TFT_WHITE, TFT_BLACK, false);
+   for (int k = 0; k <= 4; k++) {
+      const int y = mapClip((float)k, 0, 4, GRAPH_HEIGHT, 0);
+      snprintf(label, sizeof label, "%.2f kW", IMMERSION_MAX_POWER_W * k / 4000.0f);
+      tft.drawString(label, 2, k == 4 ? y + 2 : y - 16, 2);
+   }
+   snprintf(label, sizeof label, "Now %.2f kW", latest_data.immersion_power / 1000.0f);
+   tft.drawString(label, 75, 3, 2);
+   snprintf(label, sizeof label, "Today %.2f kWh", latest_data.hotwater_kwh);
+   tft.drawString(label, 190, 3, 2);
+}
+
+// True if a touch is on the immersion heater widget (icon and power / energy text).
+static bool touchedImmersion(int x, int y) {
+   return x >= IMMERSION_X && x < IMMERSION_X + IMMERSION_W &&
+          y >= IMMERSION_Y && y < IMMERSION_Y + IMMERSION_H;
+}
+
 // True if a touch is on the battery widget (icon, power/energy text and level bar).
 static bool touchedBattery(int x, int y) {
    return x >= BATTERY_X && x < BATTERY_X + BATTERY_W &&
@@ -873,6 +914,8 @@ static void handleTouch(uint32_t now) {
       AshpView();
       tft.fillScreen(TFT_BLACK);
       drawDashboard();
+   } else if (touchedImmersion(x, y)) {      // checked first: the battery widget's last 2 rows overlap it
+      ImmersionGraph();
    } else if (touchedBattery(x, y)) {
       AnkerGraph();
    } else if (y < 50) {
