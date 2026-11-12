@@ -137,7 +137,8 @@ static bool     data_dirty       = false;  // new data since the last redraw
 static bool     have_data        = false;  // at least one MQTT message received
 static bool     hold_active      = false;  // a touched screen is being held on display
 static bool     dashboard_on_screen = false; // the dashboard (not a graph / info screen) is what is displayed
-static int      battery_phase    = 0;      // animation position of the battery arrows, in pixels
+static uint32_t arrow_phase      = 0;      // animation position of the flowing dashes on the house overview arrows, in pixels
+static bool     arrow_flowing    = false;  // the last house overview drawn had at least one animated arrow
 static uint32_t hold_until       = 0;
 static uint32_t last_redraw      = 0;
 static bool     chicken_bed_time = false;
@@ -324,35 +325,6 @@ static void ImmersionDraw(void){
 }
 
 
-// Animated arrows in the strip to the right of the battery icon: chevrons scroll upwards while
-// charging (green) and downwards while discharging (orange). The scroll speed follows the power,
-// and a grey dash is shown when the battery is idle. anker_power is negative while charging.
-static void drawBatteryArrows(TFT_eSprite& spr, float power_w) {
-   const int CX    = BATTERY_W - 5;                // centre column of the strip (x 60..69)
-   const int H     = icon_battery_height;          // arrows stay level with the icon, above the text
-   const int PITCH = 12;                           // distance between chevrons
-   const int CH    = 4;                            // chevron height in rows
-   const int CYCLE = PITCH * 4;                    // phase wraps here (>= H + CH so there are no gaps)
-
-   if (!(fabsf(power_w) > BATTERY_IDLE_W)) {       // idle (also true for NaN)
-      spr.fillRect(CX - 3, H / 2 - 1, 7, 2, TFT_DARKGREY);
-      return;
-   }
-   const bool     charging = power_w < 0;
-   const uint16_t colour   = charging ? TFT_GREEN : TFT_ORANGE;
-   for (int k = 0; k < CYCLE / PITCH; k++) {
-      const int p = (k * PITCH + battery_phase) % CYCLE;
-      const int y = charging ? H - p : p - CH;     // charging moves up the screen, discharging down
-      for (int r = 0; r < CH; r++) {
-         const int yy = y + r;
-         if (yy < 0 || yy >= H) continue;          // clip to the strip
-         const int o = charging ? r : CH - 1 - r;  // apex at the top when charging, at the bottom otherwise
-         spr.fillRect(CX - o - 1, yy, 2, 1, colour);
-         spr.fillRect(CX + o,     yy, 2, 1, colour);
-      }
-   }
-}
-
 static void Battery_Draw(float battery_power, float battery_energy) {
    LOGF("Battery_Draw: battery_power=%.2f battery_energy=%.2f\n", battery_power, battery_energy);
    sprite_battery.fillScreen(TFT_BLACK);
@@ -374,8 +346,6 @@ static void Battery_Draw(float battery_power, float battery_energy) {
       sprite_battery.fillRect(13, 25, BAR_SIZE,   14, TFT_LIGHTGREY);
       sprite_battery.fillRect(13, 25, width,      14, colour_bar[colour_index]);
    }
-
-   drawBatteryArrows(sprite_battery, latest_data.anker_power);
 
    sprite_battery.pushSprite(BATTERY_X, BATTERY_Y, TFT_TRANSPARENT);
 }
@@ -437,6 +407,7 @@ static void HotWater() {
 }
 
 uint16_t PowerToColour(float p_watts) {
+   p_watts = fabsf(p_watts);       // charging / exporting power is negative: colour follows the magnitude
    if(p_watts< 250) {
       return TFT_DARKGREY;
    } else if(p_watts < 500) {
@@ -472,7 +443,21 @@ uint16_t PowerToSize(float p_watts) {
 #include <TFT_eSPI.h>
 #include <cmath>
 
-void drawArrowLine(TFT_eSPI &tft, int32_t ax, int32_t ay, int32_t bx, int32_t by, int32_t width, uint16_t color, bool enable_arrow_head) {
+void drawArrowLine(TFT_eSPI &tft, int32_t ax, int32_t ay, int32_t bx, int32_t by, int32_t width, uint16_t color, bool enable_arrow_head, int32_t phase = -1);
+
+// Colour at about 40% brightness (RGB565 channels scaled), used for the line behind the moving dashes.
+static uint16_t dimColour(uint16_t c) {
+    const uint16_t r = ((c >> 11) & 0x1F) * 2 / 5;
+    const uint16_t g = ((c >> 5)  & 0x3F) * 2 / 5;
+    const uint16_t b = (c & 0x1F) * 2 / 5;
+    return (r << 11) | (g << 5) | b;
+}
+
+// Draws a line from A to B with an optional arrowhead at B. With phase < 0 the line is solid.
+// With phase >= 0 the line is drawn dim and bright dashes of the same colour travel along it from
+// A towards B: increasing `phase` (in pixels) moves them forward. Width and colour are unchanged,
+// so they still show the size of the power.
+void drawArrowLine(TFT_eSPI &tft, int32_t ax, int32_t ay, int32_t bx, int32_t by, int32_t width, uint16_t color, bool enable_arrow_head, int32_t phase) {
     // Calculate direction vector from start (A) to end (B)
     float dx = (float)(bx - ax);
     float dy = (float)(by - ay);
@@ -489,11 +474,26 @@ void drawArrowLine(TFT_eSPI &tft, int32_t ax, int32_t ay, int32_t bx, int32_t by
     float py = ux;
 
     // 1. Draw the wide line (supports widths 1 to 5 cleanly)
+    const bool flowing = phase >= 0;
+    const uint16_t base_colour = flowing ? dimColour(color) : color;
     for (int i = 0; i < width; ++i) {
         float offset = i - (width - 1) / 2.0f;
         int32_t ox = (int32_t)round(px * offset);
         int32_t oy = (int32_t)round(py * offset);
-        tft.drawLine(ax + ox, ay + oy, bx + ox, by + oy, color);
+        tft.drawLine(ax + ox, ay + oy, bx + ox, by + oy, base_colour);
+
+        if (flowing) {
+            // Bright dashes: dash length and spacing grow with the line width
+            const int32_t dash   = 5 + width;
+            const int32_t period = dash * 5 / 2;
+            for (float t = (float)(phase % period) - period; t < len; t += period) {
+                const float t0 = t < 0 ? 0 : t;
+                const float t1 = (t + dash) > len ? len : (t + dash);
+                if (t1 <= t0) continue;
+                tft.drawLine(ax + ox + (int32_t)round(ux * t0), ay + oy + (int32_t)round(uy * t0),
+                             ax + ox + (int32_t)round(ux * t1), ay + oy + (int32_t)round(uy * t1), color);
+            }
+        }
     }
 
     // 2. Draw arrowhead only if enabled
@@ -516,7 +516,16 @@ void drawArrowLine(TFT_eSPI &tft, int32_t ax, int32_t ay, int32_t bx, int32_t by
         tft.fillTriangle(bx, by, wing1_x, wing1_y, wing2_x, wing2_y, color);
     }
 }
+// Animation phase for an arrow carrying p watts: -1 (static) when it is idle, otherwise the current
+// phase of the flowing dashes. Also records that something is flowing so animateArrows keeps running.
+static int32_t arrowPhase(float p) {
+   if (!(fabsf(p) > ARROW_ANIM_MIN_W)) return -1;               // idle (also false for NaN)
+   arrow_flowing = true;
+   return (int32_t)(arrow_phase & 0x7FFFFFFF);
+}
+
 static void drawHouseOverview() {
+   arrow_flowing = false;
    sprite_power.setTextColor(TFT_WHITE, TFT_BLACK);
 
    sprite_power.fillScreen(TFT_BLACK);
@@ -541,22 +550,22 @@ static void drawHouseOverview() {
       //Import
       const float p = latest_data.power;
       const bool enable_arrow_head = p>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power,35      ,35    , HOUSE_X-2,HOUSE_Y+16-8,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power,35      ,35    , HOUSE_X-2,HOUSE_Y+16-8,  PowerToSize(p), PowerToColour(p),enable_arrow_head, arrowPhase(p) );
    } else {
       //Export
       const float p = latest_data.power;
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power,HOUSE_X-2,HOUSE_Y+16-8, 35      ,35    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power,HOUSE_X-2,HOUSE_Y+16-8, 35      ,35    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head, arrowPhase(p) );
    }
    {
       const float p = latest_data.solaredge_power;
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power, 35      ,120   , HOUSE_X-2,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power, 35      ,120   , HOUSE_X-2,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head, arrowPhase(p) );
    }
    {
       const float p = (latest_data.midea_current*latest_data.midea_voltage *MIDEA_POWER_SCALE);///1000.0f; 
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16-8, 159    ,ASHP_Y + 20,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16-8, 159    ,ASHP_Y + 20,  PowerToSize(p), PowerToColour(p),enable_arrow_head, arrowPhase(p) );
    }
    const int arrow_end_x = 159;
    const int arrow_end_y = 105;
@@ -564,19 +573,19 @@ static void drawHouseOverview() {
       //Charge
       const float p = latest_data.anker_power;
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16+8, arrow_end_x    ,arrow_end_y    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16+8, arrow_end_x    ,arrow_end_y    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head, arrowPhase(p) );
    } else {
       //Discharge
       const float p = latest_data.anker_power;
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power, arrow_end_x    ,arrow_end_y    , HOUSE_X+32,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power, arrow_end_x    ,arrow_end_y    , HOUSE_X+32,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head, arrowPhase(p) );
    }
    {
       int arrow_end_x = 159;
       int arrow_end_y = 150;
       const float p = (150); 
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16+8, arrow_end_x    ,arrow_end_y    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16+8, arrow_end_x    ,arrow_end_y    ,  PowerToSize(p), PowerToColour(p),enable_arrow_head, arrowPhase(p) );
    }
    
 
@@ -1237,21 +1246,18 @@ static void maintainConnections(uint32_t now) {
 /////////////////////////////////////
 // Periodic work
 /////////////////////////////////////
-// Advance the battery arrows and redraw just the battery widget. Runs only while the dashboard
-// is on screen, and not at all while the battery is idle (apart from one redraw to show the idle dash).
-static void animateBattery(uint32_t now) {
+// Move the flowing dashes on the house overview arrows. Redraws the house overview ~10 times a
+// second, but only while the dashboard is on screen and at least one arrow is carrying power
+// (plus one redraw when the last one stops, so the arrows return to their static look).
+static void animateArrows(uint32_t now) {
    static uint32_t last_frame = 0;
-   static bool     was_active = false;
-   if (!dashboard_on_screen || (now - last_frame) < BATTERY_ANIM_MS) return;
+   static bool     was_flowing = false;
+   if (!dashboard_on_screen || (now - last_frame) < ARROW_ANIM_MS) return;
    last_frame = now;
-
-   const float w = fabsf(latest_data.anker_power);
-   const bool active = w > BATTERY_IDLE_W;                      // false for NaN
-   if (!active && !was_active) return;
-   was_active = active;
-   if (active)                                                  // 1..3 px per frame as the power rises
-      battery_phase = (battery_phase + constrain(1 + (int)(2.0f * w / BATTERY_FULL_SPEED_W), 1, 3)) % 48;
-   Battery_Draw(latest_data.anker_power / 1000.0, (latest_data.anker_energy / 100.0) * 5.0f);
+   if (!arrow_flowing && !was_flowing) return;
+   was_flowing = arrow_flowing;
+   arrow_phase += ARROW_ANIM_STEP_PX;
+   drawHouseOverview();                                         // sets arrow_flowing for the next frame
 }
 
 static void redrawIfDue(uint32_t now) {
@@ -1362,5 +1368,5 @@ void loop() {
    maintainConnections(now);
    client.loop();
    redrawIfDue(millis());
-   animateBattery(millis());
+   animateArrows(millis());
 }

@@ -46,9 +46,9 @@
 #define BATTERY_Y    83
 #define BATTERY_W    70
 #define BATTERY_H    80
-#define BATTERY_ANIM_MS        120      // battery arrow animation frame period
-#define BATTERY_IDLE_W         20.0f    // below this power the battery counts as idle (no animation)
-#define BATTERY_FULL_SPEED_W   1000.0f  // power at which the arrows scroll at their fastest
+#define ARROW_ANIM_MS          100      // house overview arrow animation frame period
+#define ARROW_ANIM_STEP_PX     3        // how far the dashes move each frame (pixels)
+#define ARROW_ANIM_MIN_W       100.0f   // arrows carrying less than this are drawn static (as with the arrowhead)
 #define IMMERSION_W  70  
 #define IMMERSION_X  178  
 #define IMMERSION_Y  161
