@@ -3,6 +3,7 @@
 
 #include <WiFi.h>
 #include <time.h>
+#include <Preferences.h>
 #include <PubSubClient.h>
 #include <TFT_eSPI.h>
 #include <ArduinoJson.h>
@@ -120,6 +121,14 @@ static float ashpPowerKw() {
    return (latest_data.midea_current * latest_data.midea_voltage * MIDEA_POWER_SCALE) / 1000.0f;
 }
 
+// Heat pump energy used today: the estimated power (ashpPowerKw) integrated over time. It resets at
+// local midnight and is saved to flash now and then, so a reboot does not lose the day's total.
+static float       ashp_kwh_today      = 0;
+static int         ashp_kwh_day        = -1;      // local day (year * 1000 + day of year) the total belongs to
+static bool        ashp_have_data      = false;   // a midea/current message has arrived
+static uint32_t    ashp_last_update_ms = 0;       // when it last arrived
+static Preferences prefs;
+
 #define WATER_COLOURS 20
 static uint16_t water_temp_colour_scale[WATER_COLOURS];
 
@@ -127,6 +136,8 @@ static uint16_t water_temp_colour_scale[WATER_COLOURS];
 static bool     data_dirty       = false;  // new data since the last redraw
 static bool     have_data        = false;  // at least one MQTT message received
 static bool     hold_active      = false;  // a touched screen is being held on display
+static bool     dashboard_on_screen = false; // the dashboard (not a graph / info screen) is what is displayed
+static int      battery_phase    = 0;      // animation position of the battery arrows, in pixels
 static uint32_t hold_until       = 0;
 static uint32_t last_redraw      = 0;
 static bool     chicken_bed_time = false;
@@ -255,6 +266,9 @@ static void Ashp_Draw(float ashp_power, float ashp_energy_today) {
       snprintf(buf, sizeof buf, "%.1f KW",power_estimate);
       sprite_ashp.drawString(buf, 0, 29 + 16, 2);
 
+      snprintf(buf, sizeof buf, "%.1f KWh", ashp_energy_today);     // energy used today, under the power
+      sprite_ashp.drawString(buf, 0, 29 + 16 + 16, 2);
+
       //snprintf(buf, sizeof buf, "%.1f C", latest_data.midea_target_temperature);
       //sprite_ashp.drawString(buf, 0, 29 + 16+ 17 , 2);
    }
@@ -310,6 +324,35 @@ static void ImmersionDraw(void){
 }
 
 
+// Animated arrows in the strip to the right of the battery icon: chevrons scroll upwards while
+// charging (green) and downwards while discharging (orange). The scroll speed follows the power,
+// and a grey dash is shown when the battery is idle. anker_power is negative while charging.
+static void drawBatteryArrows(TFT_eSprite& spr, float power_w) {
+   const int CX    = BATTERY_W - 5;                // centre column of the strip (x 60..69)
+   const int H     = icon_battery_height;          // arrows stay level with the icon, above the text
+   const int PITCH = 12;                           // distance between chevrons
+   const int CH    = 4;                            // chevron height in rows
+   const int CYCLE = PITCH * 4;                    // phase wraps here (>= H + CH so there are no gaps)
+
+   if (!(fabsf(power_w) > BATTERY_IDLE_W)) {       // idle (also true for NaN)
+      spr.fillRect(CX - 3, H / 2 - 1, 7, 2, TFT_DARKGREY);
+      return;
+   }
+   const bool     charging = power_w < 0;
+   const uint16_t colour   = charging ? TFT_GREEN : TFT_ORANGE;
+   for (int k = 0; k < CYCLE / PITCH; k++) {
+      const int p = (k * PITCH + battery_phase) % CYCLE;
+      const int y = charging ? H - p : p - CH;     // charging moves up the screen, discharging down
+      for (int r = 0; r < CH; r++) {
+         const int yy = y + r;
+         if (yy < 0 || yy >= H) continue;          // clip to the strip
+         const int o = charging ? r : CH - 1 - r;  // apex at the top when charging, at the bottom otherwise
+         spr.fillRect(CX - o - 1, yy, 2, 1, colour);
+         spr.fillRect(CX + o,     yy, 2, 1, colour);
+      }
+   }
+}
+
 static void Battery_Draw(float battery_power, float battery_energy) {
    LOGF("Battery_Draw: battery_power=%.2f battery_energy=%.2f\n", battery_power, battery_energy);
    sprite_battery.fillScreen(TFT_BLACK);
@@ -331,6 +374,8 @@ static void Battery_Draw(float battery_power, float battery_energy) {
       sprite_battery.fillRect(13, 25, BAR_SIZE,   14, TFT_LIGHTGREY);
       sprite_battery.fillRect(13, 25, width,      14, colour_bar[colour_index]);
    }
+
+   drawBatteryArrows(sprite_battery, latest_data.anker_power);
 
    sprite_battery.pushSprite(BATTERY_X, BATTERY_Y, TFT_TRANSPARENT);
 }
@@ -511,7 +556,7 @@ static void drawHouseOverview() {
    {
       const float p = (latest_data.midea_current*latest_data.midea_voltage *MIDEA_POWER_SCALE);///1000.0f; 
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16-8, 159    ,40     ,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
+      drawArrowLine(sprite_power, HOUSE_X+32,HOUSE_Y+16-8, 159    ,ASHP_Y + 20,  PowerToSize(p), PowerToColour(p),enable_arrow_head );
    }
    const int arrow_end_x = 159;
    const int arrow_end_y = 105;
@@ -548,7 +593,7 @@ static void drawDashboard() {
    Energy(latest_data.energy);
 #endif
    TadoDraw();
-   Ashp_Draw(latest_data.ashp_power, latest_data.ashp_energy_today);
+   Ashp_Draw(latest_data.ashp_power, ashp_kwh_today);
    Battery_Draw(latest_data.anker_power/1000.0, (latest_data.anker_energy/100.0) * 5.0f); // convert to KWh
    ImmersionDraw();
 }
@@ -909,11 +954,13 @@ static void handleTouch(uint32_t now) {
 
    setBacklight(BACKLIGHT_FULL);
    tft.fillScreen(TFT_BLACK);
+   dashboard_on_screen = false;      // set again below by the branches that draw the dashboard
 
    if (x > ASHP_X && x < ASHP_X + ASHP_W && y > ASHP_Y && y < ASHP_Y + ASHP_H) {
       AshpView();
       tft.fillScreen(TFT_BLACK);
       drawDashboard();
+      dashboard_on_screen = true;
    } else if (touchedImmersion(x, y)) {      // checked first: the battery widget's last 2 rows overlap it
       ImmersionGraph();
    } else if (touchedBattery(x, y)) {
@@ -924,6 +971,7 @@ static void handleTouch(uint32_t now) {
       PowersGraph();
    } else if (x < 280) {
       drawDashboard();
+      dashboard_on_screen = true;
    } else {
       HotGraph();
    }
@@ -945,7 +993,45 @@ static void pushTankLower(float v) { pushSample(previous.low, v); }
 static void pushTankBottom(float v){ pushSample(previous.bot, v); }
 static void pushAnkerPower(float v){ anker_power_hist.push(v); }
 static void pushAnkerSoc(float v)  { anker_soc_hist.push(v); }
-static void pushAshp(float)        { ashp_power_hist.push(ashpPowerKw()); }   // called after midea_current is stored
+static void pushAshp(float) {                                    // called after midea_current is stored
+   ashp_have_data      = true;
+   ashp_last_update_ms = millis();
+   ashp_power_hist.push(ashpPowerKw());
+}
+
+// Once a second: add the heat pump energy used since the last call, and start a new day at local
+// midnight. Power is only counted while midea/current messages keep arriving (so a dropped MQTT
+// connection does not keep adding the last value), and only when it is plausible.
+static void updateAshpEnergy(uint32_t now) {
+   static uint32_t last_tick = 0;
+   static uint32_t last_save = 0;
+   static float    saved_kwh = -1;
+   const uint32_t  dt_ms     = now - last_tick;
+   if (dt_ms < 1000) return;
+   last_tick = now;
+
+   struct tm t;
+   if (!getLocalTime(&t, 0)) return;                              // clock not set yet
+   const int day = (t.tm_year + 1900) * 1000 + t.tm_yday;
+   if (day != ashp_kwh_day) {                                     // new day (or first run after boot)
+      if (ashp_kwh_day != -1) ashp_kwh_today = 0;                 // -1: keep the total loaded from flash
+      ashp_kwh_day = day;
+      saved_kwh = -1;                                             // force a save below
+   }
+
+   const float kw = ashpPowerKw();
+   if (ashp_have_data && (now - ashp_last_update_ms) < ASHP_ENERGY_MAX_GAP_MS && kw > 0 && kw < 20) {
+      ashp_kwh_today += kw * (float)dt_ms / 3600000.0f;           // kW x ms -> kWh
+      data_dirty = true;                                          // let the new total reach the screen
+   }
+
+   if (fabsf(ashp_kwh_today - saved_kwh) > 0.001f && (saved_kwh < 0 || now - last_save >= ASHP_ENERGY_SAVE_MS)) {
+      last_save = now;
+      saved_kwh = ashp_kwh_today;
+      prefs.putFloat("ashp_kwh", ashp_kwh_today);
+      prefs.putInt("ashp_day", ashp_kwh_day);
+   }
+}
 
 static void onPlug1(const uint8_t* data, unsigned int len, float value) {
    latest_data.plug_heater = (int)value;
@@ -1151,6 +1237,23 @@ static void maintainConnections(uint32_t now) {
 /////////////////////////////////////
 // Periodic work
 /////////////////////////////////////
+// Advance the battery arrows and redraw just the battery widget. Runs only while the dashboard
+// is on screen, and not at all while the battery is idle (apart from one redraw to show the idle dash).
+static void animateBattery(uint32_t now) {
+   static uint32_t last_frame = 0;
+   static bool     was_active = false;
+   if (!dashboard_on_screen || (now - last_frame) < BATTERY_ANIM_MS) return;
+   last_frame = now;
+
+   const float w = fabsf(latest_data.anker_power);
+   const bool active = w > BATTERY_IDLE_W;                      // false for NaN
+   if (!active && !was_active) return;
+   was_active = active;
+   if (active)                                                  // 1..3 px per frame as the power rises
+      battery_phase = (battery_phase + constrain(1 + (int)(2.0f * w / BATTERY_FULL_SPEED_W), 1, 3)) % 48;
+   Battery_Draw(latest_data.anker_power / 1000.0, (latest_data.anker_energy / 100.0) * 5.0f);
+}
+
 static void redrawIfDue(uint32_t now) {
    if (!data_dirty) return;
    if (hold_active) {
@@ -1167,10 +1270,12 @@ static void redrawIfDue(uint32_t now) {
       tft.fillScreen(TFT_BLACK);
       setBacklight(BACKLIGHT_FULL);
       drawDashboard();
+      dashboard_on_screen = true;
       if (chicken_bed_time)
          tft.drawString("CHICKENS BEDTIME ", 50, 100);
    } else {
       setBacklight(0);
+      dashboard_on_screen = false;
    }
 }
 
@@ -1236,6 +1341,11 @@ void setup() {
       previous.bot[i] = 20;
    }
 
+   // Heat pump energy used today survives a reboot (see updateAshpEnergy)
+   prefs.begin("roost", false);
+   ashp_kwh_today = prefs.getFloat("ashp_kwh", 0);
+   ashp_kwh_day   = prefs.getInt("ashp_day", -1);
+
    connectWifi();
    client.setServer(mqtt_server, MQTT_PORT);
    client.setCallback(onMessage);
@@ -1248,7 +1358,9 @@ void loop() {
    const uint32_t now = millis();
    handleTouch(now);
    chickenFlash(now);
+   updateAshpEnergy(now);
    maintainConnections(now);
    client.loop();
    redrawIfDue(millis());
+   animateBattery(millis());
 }

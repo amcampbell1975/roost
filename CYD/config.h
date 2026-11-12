@@ -29,9 +29,11 @@
 #define TANK_W    60
 #define TANK_H    220
 #define ASHP_X    178
-#define ASHP_Y    20
+#define ASHP_Y    5       // sits 15 px higher than before to make room for the energy line (ends where the battery starts)
 #define ASHP_W    70
-#define ASHP_H    60 
+#define ASHP_H    78
+#define ASHP_ENERGY_MAX_GAP_MS 300000  // stop counting energy if midea/current has not been received for this long
+#define ASHP_ENERGY_SAVE_MS    ((60*60) * 1000 )  // (60sec * 60 min* 1000ms =1 hour)  save the day's energy total to flash at most this often
 #define ENERGY_X  0
 #define ENERGY_Y  200
 #define ENERGY_W  160
