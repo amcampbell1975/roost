@@ -19,6 +19,9 @@
 #endif
 #include "config.h"
 #include "util.h"
+#if WEB_MIRROR_ENABLED
+#include "webmirror.h"
+#endif
 #include "src/generated/icon_ashp.h"   
 #include "src/generated/icon_grid.h"   
 #include "src/generated/icon_heater.h" 
@@ -821,6 +824,9 @@ static void InfoScreen() {
    else
       tft.drawString("CHICKENS UPTIME", 20, 30);
 
+   tft.drawString("IP ", 20, 40);
+   tft.drawString(WiFi.localIP().toString(), 70, 40);
+
    tft.drawString("Local Time ", 20, 50);
    tft.drawNumber(solar.hour,   170, 50);
    tft.drawNumber(solar.minute, 190, 50);
@@ -932,6 +938,9 @@ static void AshpView() {
    while ((int32_t)(millis() - deadline) < 0) {
       delay(1);
       client.loop();
+#if WEB_MIRROR_ENABLED
+      webMirrorLoop();                          // keep the web page updating while this view is open
+#endif
       int x, y;
       if (!readTouch(x, y)) continue;
       if (x >= GRAPH_X) return;                 // touch on the graph: close
@@ -1197,10 +1206,10 @@ static void showStatus(const String& text, int row) {
 }
 
 static void connectWifi() {
-   showStatus("Connecting to Wifi " + String(ssid), 0);
+   showStatus("Connecting to Wifi " + String(WIFI_SSID), 0);
    WiFi.mode(WIFI_STA);
    WiFi.setAutoReconnect(true);
-   WiFi.begin(ssid, password);
+   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
    const uint32_t start = millis();
    while (WiFi.status() != WL_CONNECTED) {
@@ -1227,6 +1236,7 @@ static void maintainConnections(uint32_t now) {
       return;
    }
    if (client.connected()) return;
+   showStatus("IP Address: " + WiFi.localIP().toString(), 1);
 
    next_try = now + MQTT_RETRY_MS;
    showStatus("Connecting to MQTT " + String(mqtt_server), 2);
@@ -1353,6 +1363,9 @@ void setup() {
    ashp_kwh_day   = prefs.getInt("ashp_day", -1);
 
    connectWifi();
+#if WEB_MIRROR_ENABLED
+   webMirrorBegin(tft);
+#endif
    client.setServer(mqtt_server, MQTT_PORT);
    client.setCallback(onMessage);
    client.setSocketTimeout(MQTT_SOCKET_TIMEOUT_S);
@@ -1367,6 +1380,9 @@ void loop() {
    updateAshpEnergy(now);
    maintainConnections(now);
    client.loop();
+#if WEB_MIRROR_ENABLED
+   webMirrorLoop();
+#endif
    redrawIfDue(millis());
    animateArrows(millis());
 }

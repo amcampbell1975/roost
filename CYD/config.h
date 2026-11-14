@@ -49,6 +49,11 @@
 #define ARROW_ANIM_MS          100      // house overview arrow animation frame period
 #define ARROW_ANIM_STEP_PX     3        // how far the dashes move each frame (pixels)
 #define ARROW_ANIM_MIN_W       100.0f   // arrows carrying less than this are drawn static (as with the arrowhead)
+
+// Web mirror (webmirror.h): read-only web page that shows what is on the TFT
+#define WEB_MIRROR_ENABLED         1     // 0 removes the web server completely
+#define WEB_MIRROR_STRIP_ROWS      8     // screen rows read back per step (RAM use: about 1.6 KB per row)
+#define WEB_MIRROR_MIN_INTERVAL_MS 500   // refuse screenshots requested more often than this
 #define IMMERSION_W  70  
 #define IMMERSION_X  178  
 #define IMMERSION_Y  161
