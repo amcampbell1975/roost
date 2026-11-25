@@ -132,6 +132,13 @@ static bool        ashp_have_data      = false;   // a midea/current message has
 static uint32_t    ashp_last_update_ms = 0;       // when it last arrived
 static Preferences prefs;
 
+// Solar energy generated today: the SolarEdge power integrated over time, the same way as the heat
+// pump total above (resets at local midnight, saved to flash now and then).
+static float       solar_kwh_today      = 0;
+static int         solar_kwh_day        = -1;     // local day (year * 1000 + day of year) the total belongs to
+static bool        solar_have_data      = false;  // a solaredge message has arrived
+static uint32_t    solar_last_update_ms = 0;      // when it last arrived
+
 #define WATER_COLOURS 20
 static uint16_t water_temp_colour_scale[WATER_COLOURS];
 
@@ -527,7 +534,10 @@ static int32_t arrowPhase(float p) {
    return (int32_t)(arrow_phase & 0x7FFFFFFF);
 }
 
+
 static void drawHouseOverview() {
+   const int SOLAR_Y = 96;   // top of the sun icon in the house overview; power and today's energy go below it
+
    arrow_flowing = false;
    sprite_power.setTextColor(TFT_WHITE, TFT_BLACK);
 
@@ -540,9 +550,12 @@ static void drawHouseOverview() {
    }
    {
       char buf[24];
-      sprite_power.pushImage(5, 110, icon_sun_width, icon_sun_height, icon_sun_img);
+      sprite_power.pushImage(5, SOLAR_Y, icon_sun_width, icon_sun_height, icon_sun_img);
       snprintf(buf, sizeof buf, "%.2f KW", latest_data.solaredge_power / 1000.0f);
-      sprite_power.drawString(buf, 5, 110+30 , 2);
+      sprite_power.drawString(buf, 5, SOLAR_Y + 30, 2);
+
+      snprintf(buf, sizeof buf, "%.1f KWh", solar_kwh_today);       // energy generated today, under the power
+      sprite_power.drawString(buf, 5, SOLAR_Y + 30 + 16, 2);
    } 
    
    const int HOUSE_X = 80;
@@ -563,7 +576,7 @@ static void drawHouseOverview() {
    {
       const float p = latest_data.solaredge_power;
       const bool enable_arrow_head = fabsf(p)>100; // Only show arrow head if power is significant
-      drawArrowLine(sprite_power, 35      ,120   , HOUSE_X-2,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head, arrowPhase(p) );
+      drawArrowLine(sprite_power, 35      ,SOLAR_Y + 10, HOUSE_X-2,HOUSE_Y+16+8,  PowerToSize(p), PowerToColour(p),enable_arrow_head, arrowPhase(p) );
    }
    {
       const float p = (latest_data.midea_current*latest_data.midea_voltage *MIDEA_POWER_SCALE);///1000.0f; 
@@ -1051,6 +1064,40 @@ static void updateAshpEnergy(uint32_t now) {
    }
 }
 
+// Once a second: add the solar energy generated since the last call, and start a new day at local
+// midnight. Counted only while solaredge messages keep arriving (the publisher sends one every 10 s
+// in daylight and nothing when the inverter is asleep) and only when the power is plausible.
+static void updateSolarEnergy(uint32_t now) {
+   static uint32_t last_tick = 0;
+   static uint32_t last_save = 0;
+   static float    saved_kwh = -1;
+   const uint32_t  dt_ms     = now - last_tick;
+   if (dt_ms < 1000) return;
+   last_tick = now;
+
+   struct tm t;
+   if (!getLocalTime(&t, 0)) return;                              // clock not set yet
+   const int day = (t.tm_year + 1900) * 1000 + t.tm_yday;
+   if (day != solar_kwh_day) {                                    // new day (or first run after boot)
+      if (solar_kwh_day != -1) solar_kwh_today = 0;               // -1: keep the total loaded from flash
+      solar_kwh_day = day;
+      saved_kwh = -1;                                             // force a save below
+   }
+
+   const float kw = latest_data.solaredge_power / 1000.0f;
+   if (solar_have_data && (now - solar_last_update_ms) < SOLAR_ENERGY_MAX_GAP_MS && kw > 0 && kw < 20) {
+      solar_kwh_today += kw * (float)dt_ms / 3600000.0f;          // kW x ms -> kWh
+      data_dirty = true;                                          // let the new total reach the screen
+   }
+
+   if (fabsf(solar_kwh_today - saved_kwh) > 0.001f && (saved_kwh < 0 || now - last_save >= SOLAR_ENERGY_SAVE_MS)) {
+      last_save = now;
+      saved_kwh = solar_kwh_today;
+      prefs.putFloat("solar_kwh", solar_kwh_today);
+      prefs.putInt("solar_day", solar_kwh_day);
+   }
+}
+
 static void onPlug1(const uint8_t* data, unsigned int len, float value) {
    latest_data.plug_heater = (int)value;
 }
@@ -1082,6 +1129,8 @@ static void onSolarEdge(const uint8_t* data, unsigned int len, float value) {
    if (!jsonNumber(data, len, "watts", "solaredge", watts)) return;
    latest_data.solaredge_power = watts;
    pushSolar(latest_data.solaredge_power);
+   solar_have_data      = true;
+   solar_last_update_ms = millis();
 }
 
 // Tasmota energy monitor, e.g. {"Time":"...","PowerMonitor": 2807.96 ,"Vrms": 250.27 ,"ApparentPower": 2778.74 }
@@ -1357,10 +1406,12 @@ void setup() {
       previous.bot[i] = 20;
    }
 
-   // Heat pump energy used today survives a reboot (see updateAshpEnergy)
+   // Heat pump and solar energy totals for today survive a reboot (see updateAshpEnergy / updateSolarEnergy)
    prefs.begin("roost", false);
    ashp_kwh_today = prefs.getFloat("ashp_kwh", 0);
    ashp_kwh_day   = prefs.getInt("ashp_day", -1);
+   solar_kwh_today = prefs.getFloat("solar_kwh", 0);
+   solar_kwh_day   = prefs.getInt("solar_day", -1);
 
    connectWifi();
 #if WEB_MIRROR_ENABLED
@@ -1378,6 +1429,7 @@ void loop() {
    handleTouch(now);
    chickenFlash(now);
    updateAshpEnergy(now);
+   updateSolarEnergy(now);
    maintainConnections(now);
    client.loop();
 #if WEB_MIRROR_ENABLED

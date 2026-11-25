@@ -34,6 +34,8 @@
 #define ASHP_H    78
 #define ASHP_ENERGY_MAX_GAP_MS 300000  // stop counting energy if midea/current has not been received for this long
 #define ASHP_ENERGY_SAVE_MS    ((60*60) * 1000 )  // (60sec * 60 min* 1000ms =1 hour)  save the day's energy total to flash at most this often
+#define SOLAR_ENERGY_MAX_GAP_MS 120000 // stop counting solar energy if no solaredge message has arrived for this long (it publishes every 10 s)
+#define SOLAR_ENERGY_SAVE_MS   ASHP_ENERGY_SAVE_MS   // save the day's solar total to flash at most this often
 #define ENERGY_X  0
 #define ENERGY_Y  200
 #define ENERGY_W  160
