@@ -1423,7 +1423,7 @@ void setup() {
 
    connectWifi();
 #if OTA_ENABLED
-   otaBegin(tft, OTA_HOSTNAME);
+   otaBegin(tft, OTA_HOSTNAME, []() { setBacklight(BACKLIGHT_FULL); });
 #endif
 #if WEB_MIRROR_ENABLED
    webMirrorBegin(tft);

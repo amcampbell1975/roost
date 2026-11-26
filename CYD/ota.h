@@ -11,6 +11,7 @@
 
 static TFT_eSPI* ota_tft = nullptr;
 static int       ota_last_pct = -1;
+static void    (*ota_backlight_on)() = nullptr;   // turns the backlight fully on (it may be off at night)
 
 static void otaScreen(const char* line1, uint16_t colour) {
    ota_tft->fillScreen(TFT_BLACK);
@@ -20,11 +21,13 @@ static void otaScreen(const char* line1, uint16_t colour) {
    ota_tft->setTextDatum(TL_DATUM);
 }
 
-static void otaBegin(TFT_eSPI& tft, const char* hostname) {
+static void otaBegin(TFT_eSPI& tft, const char* hostname, void (*backlight_on)()) {
    ota_tft = &tft;
+   ota_backlight_on = backlight_on;
    ArduinoOTA.setHostname(hostname);
    ArduinoOTA.onStart([]() {
       ota_last_pct = -1;
+      if (ota_backlight_on) ota_backlight_on();
       otaScreen("Updating firmware", TFT_WHITE);
       ota_tft->drawRect(40, 140, 240, 20, TFT_WHITE);
       Serial.println("OTA: start");
