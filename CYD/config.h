@@ -102,6 +102,18 @@
 #define MQTT_RETRY_MS            5000
 
 /////////////////////////////////////
+// Over-the-air updates (ArduinoOTA, LAN only)
+/////////////////////////////////////
+#define OTA_ENABLED   1                // 0 removes OTA completely
+#ifndef DEVICE_NAME
+#define DEVICE_NAME   roostcyd         // normally set per environment in platformio.ini
+#endif
+#define ROOST_STR2(x) #x
+#define ROOST_STR(x)  ROOST_STR2(x)
+#define OTA_HOSTNAME  ROOST_STR(DEVICE_NAME)
+#define FW_BUILD      __DATE__ " " __TIME__
+
+/////////////////////////////////////
 // MQTT
 /////////////////////////////////////
 #define MQTT_PORT          1883

@@ -57,10 +57,10 @@ static void webHandleRoot() {
 }
 
 static void webHandleStatus() {
-   char buf[220];
+   char buf[300];
    snprintf(buf, sizeof buf,
-            "uptime_s=%lu\nfree_heap=%u\nmin_free_heap=%u\nwifi_rssi=%d\ncaptures=%lu\nrejected=%lu\nlast_capture_ms=%lu\n",
-            (unsigned long)(millis() / 1000), (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap(), (int)WiFi.RSSI(),
+            "hostname=%s\nfirmware=%s\nuptime_s=%lu\nfree_heap=%u\nmin_free_heap=%u\nwifi_rssi=%d\ncaptures=%lu\nrejected=%lu\nlast_capture_ms=%lu\n",
+            OTA_HOSTNAME, FW_BUILD, (unsigned long)(millis() / 1000), (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap(), (int)WiFi.RSSI(),
             (unsigned long)web_captures, (unsigned long)web_rejected, (unsigned long)web_last_took_ms);
    web_server.sendHeader("Cache-Control", "no-store");
    web_server.send(200, "text/plain", buf);

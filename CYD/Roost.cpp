@@ -12,12 +12,15 @@
 #include <sunset.h>
 
 #include "settings.h"
+#include "config.h"
+#if OTA_ENABLED
+#include "ota.h"      // before mywifi.h: its macros must not clash with library headers
+#endif
 #if __has_include("mywifi.h")
 #include "mywifi.h"
 #else
 #error "mywifi.h is missing: copy mywifi.h.example to mywifi.h and fill in your WiFi details."
 #endif
-#include "config.h"
 #include "util.h"
 #if WEB_MIRROR_ENABLED
 #include "webmirror.h"
@@ -869,6 +872,7 @@ static void InfoScreen() {
       tft.drawString(names[k], 40 * (k + 1) - 10, 210);
       tft.drawNumber(values[k], 40 * (k + 1), 210);
    }
+   tft.drawString(String(OTA_HOSTNAME) + "  " + FW_BUILD, 20, 228);
 }
 
 /////////////////////////////////////
@@ -951,6 +955,9 @@ static void AshpView() {
    while ((int32_t)(millis() - deadline) < 0) {
       delay(1);
       client.loop();
+#if OTA_ENABLED
+      otaLoop();
+#endif
 #if WEB_MIRROR_ENABLED
       webMirrorLoop();                          // keep the web page updating while this view is open
 #endif
@@ -1257,6 +1264,7 @@ static void showStatus(const String& text, int row) {
 static void connectWifi() {
    showStatus("Connecting to Wifi " + String(WIFI_SSID), 0);
    WiFi.mode(WIFI_STA);
+   WiFi.setHostname(OTA_HOSTNAME);
    WiFi.setAutoReconnect(true);
    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -1414,6 +1422,9 @@ void setup() {
    solar_kwh_day   = prefs.getInt("solar_day", -1);
 
    connectWifi();
+#if OTA_ENABLED
+   otaBegin(tft, OTA_HOSTNAME);
+#endif
 #if WEB_MIRROR_ENABLED
    webMirrorBegin(tft);
 #endif
@@ -1432,6 +1443,9 @@ void loop() {
    updateSolarEnergy(now);
    maintainConnections(now);
    client.loop();
+#if OTA_ENABLED
+   otaLoop();
+#endif
 #if WEB_MIRROR_ENABLED
    webMirrorLoop();
 #endif
