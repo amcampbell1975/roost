@@ -3,6 +3,7 @@
 
 #include <WiFi.h>
 #include <time.h>
+#include <ctype.h>
 #include <Preferences.h>
 #include <PubSubClient.h>
 #include <TFT_eSPI.h>
@@ -56,13 +57,22 @@ static TFT_eSprite sprite_tado     = TFT_eSprite(&tft);
 static TFT_eSprite sprite_battery  = TFT_eSprite(&tft);
 static TFT_eSprite sprite_immersion= TFT_eSprite(&tft);
 
-// Tado rooms: MQTT topic suffix and the short label drawn on the grid. Order matters
-// (it is the index into the tado_* arrays and the position on the grid).
-struct Room { const char* mqtt_name; const char* label; };
+// Tado rooms: the device name used in the MQTT topic (tado/<device>/...) and the short label drawn
+// on the grid. Order matters (it is the index into the tado_* arrays and the position on the grid).
+// device may be NULL for a room that has no Tado device.
+// *** EDIT THE DEVICE NAMES to match which radiator valve is in which room. ***
+struct Room { const char* device; const char* label; };
 #define ROOM_COUNT 9
 static const Room ROOMS[ROOM_COUNT] = {
-   {"VA Bedroom", "VA"}, {"Maddie", "M"},  {"Seb", "S"},       {"Study", "St"}, {"Bathroom", "Ba"},
-   {"Dining Room", "D"}, {"Lounge", "L"},  {"Hallway", "H"},   {"Kitchen", "K"}
+   {"tado_smart_radiator_thermostat_va0278288640", "VA"},
+   {"tado_smart_radiator_thermostat_va0446060800", "M" },  
+   {"tado_smart_radiator_thermostat_va0462838016", "S" },
+   {"tado_smart_radiator_thermostat_va1066359040", "St"},  
+   {"tado_smart_radiator_thermostat_va1804818688", "Ba"},
+   {"tado_smart_radiator_thermostat_va3287698432", "D" }, 
+   {"tado_smart_radiator_thermostat_va2962512128", "L" }, 
+   {"tado_smart_radiator_thermostat_va2592889088", "H" },
+   {"tado_smart_thermostat_su3519503104",          "K" }
 };
 #define KITCHEN_INDEX 8   // central room: no radiator valve
 
@@ -81,7 +91,7 @@ struct LatestData {
    float ashp_power = 0;
    float ashp_energy_today = 0;
    float tado_current_temperature[ROOM_COUNT] = {0};
-   float tado_valve[ROOM_COUNT] = {0};
+   float tado_valve[ROOM_COUNT] = {0};   // 100 while the radiator valve is heating, else 0
    float midea_current = 0;
    float midea_voltage = 0;
    float midea_power_mode = 0;
@@ -1187,24 +1197,29 @@ static const Binding BINDINGS[] = {
 };
 static const int BINDING_COUNT = sizeof(BINDINGS) / sizeof(BINDINGS[0]);
 
-// Per-room topics: <prefix><room name>
-struct RoomTopic { const char* prefix; float* values; };
-static const RoomTopic ROOM_TOPICS[2] = {
-   {"tado/current_temp/", latest_data.tado_current_temperature},
-   {"tado/valve/",        latest_data.tado_valve},
-};
+// Tado topics: tado/<device>/current_temperature (e.g. 19.6) and tado/<device>/heating_state
+// (off | heating | cooling). The device is looked up in ROOMS; devices not listed are ignored.
+static const char TADO_TEMP_FILTER[]  = "tado/+/current_temperature";
+static const char TADO_STATE_FILTER[] = "tado/+/heating_state";
 
-static bool handleRoomTopic(const char* topic, float value) {
-   for (int k = 0; k < 2; k++) {
-      const size_t plen = strlen(ROOM_TOPICS[k].prefix);
-      if (strncmp(topic, ROOM_TOPICS[k].prefix, plen) != 0) continue;
-      for (int r = 0; r < ROOM_COUNT; r++) {
-         if (strcmp(topic + plen, ROOMS[r].mqtt_name) == 0) {
-            ROOM_TOPICS[k].values[r] = value;
-            return true;
-         }
-      }
-      return false;   // right prefix, unknown room
+static bool handleRoomTopic(const char* topic, const char* text, float value) {
+   if (strncmp(topic, "tado/", 5) != 0) return false;
+   const char* device = topic + 5;
+   const char* slash  = strchr(device, '/');
+   if (!slash) return false;
+   const size_t dlen  = (size_t)(slash - device);
+   const char*  field = slash + 1;
+   const bool is_temp  = strcmp(field, "current_temperature") == 0;
+   const bool is_state = strcmp(field, "heating_state") == 0;
+   if (!is_temp && !is_state) return false;
+   if (is_temp && !(isdigit((unsigned char)text[0]) || text[0] == '-')) return false;   // e.g. "unavailable"
+
+   for (int r = 0; r < ROOM_COUNT; r++) {
+      const char* name = ROOMS[r].device;
+      if (!name || strlen(name) != dlen || strncmp(name, device, dlen) != 0) continue;
+      if (is_temp) latest_data.tado_current_temperature[r] = value;
+      else         latest_data.tado_valve[r] = strcmp(text, "heating") == 0 ? 100.0f : 0.0f;
+      return true;
    }
    return false;
 }
@@ -1218,7 +1233,7 @@ static void onMessage(char* topic, byte* payload, unsigned int length) {
    const float value = (float)atof(text);
    LOGF("MQTT '%s' '%s'\n", topic, text);
 
-   bool known = handleRoomTopic(topic, value);
+   bool known = handleRoomTopic(topic, text, value);
    for (int i = 0; i < BINDING_COUNT && !known; i++) {
       const Binding& b = BINDINGS[i];
       if (strcmp(topic, b.topic) != 0) continue;
@@ -1241,13 +1256,8 @@ static void subscribeAll() {
       client.subscribe(BINDINGS[i].topic);
       LOGF("MQTT Subscribe %d '%s' \n", i, BINDINGS[i].topic);
    }
-   char topic[64];
-   for (int k = 0; k < 2; k++) {
-      for (int r = 0; r < ROOM_COUNT; r++) {
-         snprintf(topic, sizeof topic, "%s%s", ROOM_TOPICS[k].prefix, ROOMS[r].mqtt_name);
-         client.subscribe(topic);
-      }
-   }
+   client.subscribe(TADO_TEMP_FILTER);
+   client.subscribe(TADO_STATE_FILTER);
 }
 
 /////////////////////////////////////
