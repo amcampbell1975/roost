@@ -12,6 +12,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/home/campbell/tado
+ExecStartPre=/home/campbell/tado/venv/bin/python tado_mqtt.py discover
 ExecStart=/home/campbell/tado/venv/bin/python tado_mqtt.py run --mqtt-host 192.168.1.250
 TimeoutStartSec=infinity
 Restart=always
