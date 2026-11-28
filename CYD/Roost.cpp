@@ -132,6 +132,18 @@ static Series anker_power_hist;    // W, + = discharging, - = charging
 static Series anker_soc_hist;      // charge level, %
 static Series ashp_power_hist;     // heat pump electrical power, kW
 
+// Tado history: every TADO_HIST_INTERVAL_MS the room temperatures and radiator on/off states are
+// stored (temperature in tenths of a degree, 20 bytes per sample, about 2.9 KB in all).
+struct TadoSample {
+   int16_t  temp[ROOM_COUNT];     // 0.1 C, TADO_NO_DATA if the room has not reported yet
+   uint16_t heating;              // bit r set: room r was heating
+};
+#define TADO_NO_DATA INT16_MIN
+static_assert(ROOM_COUNT <= 16, "TadoSample::heating holds 16 rooms");
+static TadoSample tado_hist[TADO_HIST_SAMPLES];
+static int        tado_hist_count = 0;               // valid samples, newest last
+static bool       tado_temp_seen[ROOM_COUNT];        // a temperature has arrived for this room
+
 // Heat pump power estimated from the Midea current and voltage.
 static float ashpPowerKw() {
    return (latest_data.midea_current * latest_data.midea_voltage * MIDEA_POWER_SCALE) / 1000.0f;
@@ -835,6 +847,95 @@ static bool touchedBattery(int x, int y) {
           y >= BATTERY_Y && y < BATTERY_Y + BATTERY_H;
 }
 
+// True if a touch is on the Tado room grid.
+static bool touchedTado(int x, int y) {
+   return x >= TADO_X && x < TADO_X + TADO_W && y >= TADO_Y && y < TADO_Y + TADO_H;
+}
+
+// Take one Tado history sample every TADO_HIST_INTERVAL_MS.
+static void updateTadoHistory(uint32_t now) {
+   static uint32_t last_ms = 0;
+   static bool     started = false;
+   if (started && (now - last_ms) < TADO_HIST_INTERVAL_MS) return;
+   started = true;
+   last_ms = now;
+
+   if (tado_hist_count == TADO_HIST_SAMPLES)
+      memmove(&tado_hist[0], &tado_hist[1], (TADO_HIST_SAMPLES - 1) * sizeof(TadoSample));
+   else
+      tado_hist_count++;
+   TadoSample& s = tado_hist[tado_hist_count - 1];
+   s.heating = 0;
+   for (int r = 0; r < ROOM_COUNT; r++) {
+      s.temp[r] = tado_temp_seen[r] ? (int16_t)lroundf(latest_data.tado_current_temperature[r] * 10.0f) : TADO_NO_DATA;
+      if (latest_data.tado_valve[r] > 50.0f) s.heating |= (uint16_t)(1u << r);
+   }
+}
+
+// Tado history: room temperatures on a fixed 10-30 C scale over the last 12 hours (2 px per
+// 5-minute sample, newest at the right), with one thin strip per room underneath showing when
+// its radiator was heating (bright) or off (dim dot). Each room has its own colour, shown by its
+// label beside its strip.
+static void TadoGraph() {
+   static const uint16_t colours[9] = {TFT_RED, TFT_GREEN, TFT_CYAN, TFT_YELLOW, TFT_MAGENTA,
+                                       TFT_ORANGE, TFT_WHITE, 0xFE19 /*pink*/, 0x867D /*sky blue*/};
+   const int GX       = 30;                          // graph starts here; temperature labels are to the left
+   const int PX       = 2;                           // pixels per sample
+   const int GW       = TADO_HIST_SAMPLES * PX;      // 288 px = 12 hours
+   const int PLOT_H   = 160;                         // temperature plot height: 8 px per degree
+   const int STRIP_Y  = PLOT_H + 4;                  // heating strips start here
+   const int STRIP_H  = 7;
+   char label[8];
+
+   // Grid: horizontal every 5 C, vertical every hour (brighter every 3 hours)
+   for (int c = 10; c <= 30; c += 5) {
+      const int y = mapClip((float)c, TADO_GRAPH_MIN_C, TADO_GRAPH_MAX_C, PLOT_H, 0);
+      tft.drawFastHLine(GX, y, GW, c == 10 ? TFT_WHITE : TFT_DARKGREY);
+   }
+   for (int h = 0; h <= 12; h++) {
+      const int x = GX + GW - 1 - h * (3600000 / TADO_HIST_INTERVAL_MS) * PX;
+      vline(x, 0, PLOT_H + 1, h % 3 == 0 ? TFT_DARKGREY : 0x2104);   // very dark grey
+   }
+
+   // First sample is drawn so that the newest sample sits at the right-hand edge.
+   const int x_first = GX + GW - tado_hist_count * PX;
+   for (int r = 0; r < ROOM_COUNT; r++) {
+      if (!ROOMS[r].device) continue;
+      const uint16_t col = colours[r % 9];
+      const int sy = STRIP_Y + r * STRIP_H;
+      int px = -1, py = -1;
+      for (int i = 0; i < tado_hist_count; i++) {
+         const TadoSample& s = tado_hist[i];
+         const int x = x_first + i * PX;
+         if (s.temp[r] == TADO_NO_DATA) { px = -1; continue; }
+         const int y = mapClip(s.temp[r] / 10.0f, TADO_GRAPH_MIN_C, TADO_GRAPH_MAX_C, PLOT_H, 0);
+         if (px >= 0) tft.drawLine(px, py, x, y, col);
+         else         tft.drawPixel(x, y, col);
+         px = x; py = y;
+         if (s.heating & (1u << r)) tft.fillRect(x - PX + 1, sy, PX, STRIP_H - 1, col);
+         else                       tft.drawPixel(x, sy + (STRIP_H - 1) / 2, TFT_DARKGREY);
+      }
+   }
+
+   // Labels last so they stay readable
+   tft.setTextColor(TFT_WHITE, TFT_BLACK, false);
+   for (int c = 10; c <= 30; c += 5) {
+      const int y = mapClip((float)c, TADO_GRAPH_MIN_C, TADO_GRAPH_MAX_C, PLOT_H, 0);
+      snprintf(label, sizeof label, "%dC", c);
+      tft.drawString(label, 2, c == 30 ? y : (c == 10 ? y - 8 : y - 4), 1);
+   }
+   for (int h = 3; h <= 12; h += 3) {
+      snprintf(label, sizeof label, "-%dh", h);
+      const int x = GX + GW - 1 - h * (3600000 / TADO_HIST_INTERVAL_MS) * PX;
+      tft.drawString(label, h == 12 ? x + 1 : x - 9, PLOT_H - 10, 1);
+   }
+   for (int r = 0; r < ROOM_COUNT; r++) {
+      if (!ROOMS[r].device) continue;
+      tft.setTextColor(colours[r % 9], TFT_BLACK, false);
+      tft.drawString(ROOMS[r].label, 2, STRIP_Y + r * STRIP_H, 1);
+   }
+}
+
 static void drawHM(const char* label, double minutes, int y) {
    tft.drawString(label, 20, y);
    tft.drawNumber((long)(minutes / 60), 170, y);
@@ -1013,6 +1114,8 @@ static void handleTouch(uint32_t now) {
       ImmersionGraph();
    } else if (touchedBattery(x, y)) {
       AnkerGraph();
+   } else if (touchedTado(x, y)) {            // before the x < 50 test: the grid extends into that strip
+      TadoGraph();
    } else if (y < 50) {
       InfoScreen();
    } else if (x < 50) {
@@ -1217,7 +1320,7 @@ static bool handleRoomTopic(const char* topic, const char* text, float value) {
    for (int r = 0; r < ROOM_COUNT; r++) {
       const char* name = ROOMS[r].device;
       if (!name || strlen(name) != dlen || strncmp(name, device, dlen) != 0) continue;
-      if (is_temp) latest_data.tado_current_temperature[r] = value;
+      if (is_temp) { latest_data.tado_current_temperature[r] = value; tado_temp_seen[r] = true; }
       else         latest_data.tado_valve[r] = strcmp(text, "heating") == 0 ? 100.0f : 0.0f;
       return true;
    }
@@ -1451,6 +1554,7 @@ void loop() {
    chickenFlash(now);
    updateAshpEnergy(now);
    updateSolarEnergy(now);
+   updateTadoHistory(now);
    maintainConnections(now);
    client.loop();
 #if OTA_ENABLED

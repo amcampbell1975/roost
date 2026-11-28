@@ -44,6 +44,11 @@
 #define TADO_Y    170
 #define TADO_W    160
 #define TADO_H    70
+// Tado temperature history (graph opened by touching the Tado grid)
+#define TADO_HIST_SAMPLES      144       // samples kept per room
+#define TADO_HIST_INTERVAL_MS  300000    // one sample every 5 minutes: 144 x 5 min = 12 hours
+#define TADO_GRAPH_MIN_C       10.0f     // temperature scale of the graph
+#define TADO_GRAPH_MAX_C       30.0f
 #define BATTERY_X    178
 #define BATTERY_Y    83
 #define BATTERY_W    70
