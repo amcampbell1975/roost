@@ -1,0 +1,22 @@
+# sudo cp tadomqtt.service /etc/systemd/system/
+# sudo systemctl daemon-reload
+# sudo systemctl restart tadomqtt.service
+# sudo systemctl enable tadomqtt.service
+# sudo journalctl -u tadomqtt.service
+
+[Unit]
+Description=Tado MQTT Gateway Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/campbell/tado
+ExecStart=/home/campbell/tado/venv/bin/python tado_mqtt.py run --mqtt-host 192.168.1.250
+TimeoutStartSec=infinity
+Restart=always
+RestartSec=60
+
+
+[Install]
+WantedBy=multi-user.target
