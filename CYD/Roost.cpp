@@ -872,33 +872,46 @@ static void updateTadoHistory(uint32_t now) {
    }
 }
 
-// Tado history: room temperatures on a fixed 10-30 C scale over the last 12 hours (2 px per
-// 5-minute sample, newest at the right), with one thin strip per room underneath showing when
-// its radiator was heating (bright) or off (dim dot). Each room has its own colour, shown by its
-// label beside its strip.
+// Tado history: room temperatures on a fixed 10-30 C scale over the last 12 hours (newest at the
+// right), with one thin strip per room underneath showing when its radiator was heating (bright)
+// or off (dim dot). The legend (room labels in each room's colour) runs along the top; strips are
+// in the same order as the legend, left to right = top to bottom.
 static void TadoGraph() {
    static const uint16_t colours[9] = {TFT_RED, TFT_GREEN, TFT_CYAN, TFT_YELLOW, TFT_MAGENTA,
                                        TFT_ORANGE, TFT_WHITE, 0xFE19 /*pink*/, 0x867D /*sky blue*/};
-   const int GX       = 30;                          // graph starts here; temperature labels are to the left
-   const int PX       = 2;                           // pixels per sample
-   const int GW       = TADO_HIST_SAMPLES * PX;      // 288 px = 12 hours
-   const int PLOT_H   = 160;                         // temperature plot height: 8 px per degree
-   const int STRIP_Y  = PLOT_H + 4;                  // heating strips start here
-   const int STRIP_H  = 7;
+   const int LEGEND_H = 12;                          // legend row along the top
+   const int GX       = 26;                          // graph starts here; temperature labels are to the left
+   const int GW       = SCREEN_W - GX;               // 294 px = 12 hours
+   const int PLOT_Y   = LEGEND_H;                    // temperature plot: 180 px high, 9 px per degree
+   const int PLOT_H   = 180;
+   const int STRIP_Y  = PLOT_Y + PLOT_H + 3;         // heating strips start here
+   const int STRIP_H  = 5;
+   const int N        = TADO_HIST_SAMPLES;
    char label[8];
 
-   // Grid: horizontal every 5 C, vertical every hour (brighter every 3 hours)
-   for (int c = 10; c <= 30; c += 5) {
-      const int y = mapClip((float)c, TADO_GRAPH_MIN_C, TADO_GRAPH_MAX_C, PLOT_H, 0);
-      tft.drawFastHLine(GX, y, GW, c == 10 ? TFT_WHITE : TFT_DARKGREY);
-   }
-   for (int h = 0; h <= 12; h++) {
-      const int x = GX + GW - 1 - h * (3600000 / TADO_HIST_INTERVAL_MS) * PX;
-      vline(x, 0, PLOT_H + 1, h % 3 == 0 ? TFT_DARKGREY : 0x2104);   // very dark grey
+   // x position of sample slot k (0 = oldest slot, N-1 = newest, at the right-hand edge)
+   auto slotX = [&](int k) { return GX + (k * (GW - 1)) / (N - 1); };
+   auto tempY = [&](float c) { return PLOT_Y + mapClip(c, TADO_GRAPH_MIN_C, TADO_GRAPH_MAX_C, PLOT_H, 0); };
+   auto hoursX = [&](int h) { return GX + GW - 1 - (int)(h * (GW - 1) / 12.0f); };   // x of "h hours ago"
+
+   // Legend, left to right
+   int lx = 2;
+   tft.setTextDatum(TL_DATUM);
+   for (int r = 0; r < ROOM_COUNT; r++) {
+      if (!ROOMS[r].device) continue;
+      tft.setTextColor(colours[r % 9], TFT_BLACK, false);
+      tft.fillRect(lx, 2, 8, 8, colours[r % 9]);
+      lx += tft.drawString(ROOMS[r].label, lx + 11, 2, 1) + 12;
    }
 
-   // First sample is drawn so that the newest sample sits at the right-hand edge.
-   const int x_first = GX + GW - tado_hist_count * PX;
+   // Grid: horizontal every 5 C, vertical every hour (brighter every 3 hours)
+   for (int c = 10; c <= 30; c += 5)
+      tft.drawFastHLine(GX, tempY((float)c), GW, c == 10 ? TFT_WHITE : TFT_DARKGREY);
+   for (int h = 0; h <= 12; h++)
+      vline(hoursX(h), PLOT_Y, PLOT_H + 1, h % 3 == 0 ? TFT_DARKGREY : 0x2104);   // 0x2104: very dark grey
+
+   // Lines and heating strips. The newest sample sits at the right-hand edge.
+   const int first_slot = N - tado_hist_count;
    for (int r = 0; r < ROOM_COUNT; r++) {
       if (!ROOMS[r].device) continue;
       const uint16_t col = colours[r % 9];
@@ -906,33 +919,29 @@ static void TadoGraph() {
       int px = -1, py = -1;
       for (int i = 0; i < tado_hist_count; i++) {
          const TadoSample& s = tado_hist[i];
-         const int x = x_first + i * PX;
+         const int x = slotX(first_slot + i);
          if (s.temp[r] == TADO_NO_DATA) { px = -1; continue; }
-         const int y = mapClip(s.temp[r] / 10.0f, TADO_GRAPH_MIN_C, TADO_GRAPH_MAX_C, PLOT_H, 0);
+         const int y = tempY(s.temp[r] / 10.0f);
          if (px >= 0) tft.drawLine(px, py, x, y, col);
          else         tft.drawPixel(x, y, col);
-         px = x; py = y;
-         if (s.heating & (1u << r)) tft.fillRect(x - PX + 1, sy, PX, STRIP_H - 1, col);
+         const int x_from = i > 0 ? slotX(first_slot + i - 1) + 1 : x;       // bar covers the interval ending at this sample
+         if (s.heating & (1u << r)) tft.fillRect(x_from, sy, x - x_from + 1, STRIP_H - 1, col);
          else                       tft.drawPixel(x, sy + (STRIP_H - 1) / 2, TFT_DARKGREY);
+         px = x; py = y;
       }
    }
 
-   // Labels last so they stay readable
+   // Axis labels last so they stay readable
    tft.setTextColor(TFT_WHITE, TFT_BLACK, false);
    for (int c = 10; c <= 30; c += 5) {
-      const int y = mapClip((float)c, TADO_GRAPH_MIN_C, TADO_GRAPH_MAX_C, PLOT_H, 0);
+      const int y = tempY((float)c);
       snprintf(label, sizeof label, "%dC", c);
       tft.drawString(label, 2, c == 30 ? y : (c == 10 ? y - 8 : y - 4), 1);
    }
    for (int h = 3; h <= 12; h += 3) {
       snprintf(label, sizeof label, "-%dh", h);
-      const int x = GX + GW - 1 - h * (3600000 / TADO_HIST_INTERVAL_MS) * PX;
-      tft.drawString(label, h == 12 ? x + 1 : x - 9, PLOT_H - 10, 1);
-   }
-   for (int r = 0; r < ROOM_COUNT; r++) {
-      if (!ROOMS[r].device) continue;
-      tft.setTextColor(colours[r % 9], TFT_BLACK, false);
-      tft.drawString(ROOMS[r].label, 2, STRIP_Y + r * STRIP_H, 1);
+      const int x = hoursX(h);
+      tft.drawString(label, h == 12 ? x + 1 : x - 9, PLOT_Y + PLOT_H - 10, 1);
    }
 }
 
